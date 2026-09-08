@@ -43,6 +43,8 @@ INSTALLED_APPS = [
 
     'users',
     'rooms',
+    "accommodation",
+
     'rest_framework',
     'corsheaders',
 

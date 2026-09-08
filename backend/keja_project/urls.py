@@ -37,4 +37,5 @@ urlpatterns = [
         name="token_refresh",
     ),
     path("api/rooms/", include("rooms.urls")),
+    path("api/", include("accommodation.urls")),
 ]
