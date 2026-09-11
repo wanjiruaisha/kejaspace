@@ -21,3 +21,4 @@ class Room(models.Model):
 
     def __str__(self):
         return f"Room {self.room_number}"
+    
