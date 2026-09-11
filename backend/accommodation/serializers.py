@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from rooms.models import Room
-from .models import AccommodationApplication
+from .models import AccommodationApplication, Stay
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
@@ -33,3 +33,18 @@ class ApplicationSerializer(serializers.ModelSerializer):
                 "Move-in date cannot be in the past."
             )
         return value
+
+class StaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Stay
+        fields = [
+            "id",
+            "application",
+            "resident",
+            "room",
+            "status",
+            "check_in_at",
+            "check_out_at",
+            "created_at",
+        ]
+        read_only_fields = fields    
