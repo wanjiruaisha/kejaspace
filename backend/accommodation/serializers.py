@@ -9,6 +9,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
     room = serializers.PrimaryKeyRelatedField(
         queryset=Room.objects.filter(is_active=True)
     )
+    room_number = serializers.CharField(
+    source="room.room_number",
+    read_only=True,
+    )
 
     class Meta:
         model = AccommodationApplication
@@ -16,15 +20,18 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "id",
             "applicant",
             "room",
+            "room_number",
             "move_in_date",
             "status",
             "created_at",
+            
         ]
         read_only_fields = [
             "id",
             "applicant",
             "status",
             "created_at",
+            
         ]
 
     def validate_move_in_date(self, value):
@@ -35,6 +42,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
         return value
 
 class StaySerializer(serializers.ModelSerializer):
+    room_number = serializers.CharField(
+    source="room.room_number",
+    read_only=True,
+    )
+    
     class Meta:
         model = Stay
         fields = [
@@ -42,6 +54,7 @@ class StaySerializer(serializers.ModelSerializer):
             "application",
             "resident",
             "room",
+            "room_number",
             "status",
             "check_in_at",
             "check_out_at",
