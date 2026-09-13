@@ -174,4 +174,58 @@ class MyStayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Stay.objects.filter(resident=self.request.user)    
+        return Stay.objects.filter(resident=self.request.user)
+
+class StaffStayListView(generics.ListAPIView):
+    queryset = Stay.objects.all()
+    serializer_class = StaySerializer
+    permission_classes = [IsAdminUser]        
+
+class StaffStayActionView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk, action):
+        transitions = {
+            "check-in": ("reserved", "checked_in", "check_in_at"),
+            "check-out": ("checked_in", "checked_out", "check_out_at"),
+            "cancel": ("reserved", "cancelled", None),
+        }
+
+        expected_status, new_status, timestamp_field = transitions[action]
+
+        original = get_object_or_404(Stay, pk=pk)
+
+        with transaction.atomic():
+            get_user_model().objects.select_for_update().get(
+                pk=original.resident_id
+            )
+
+            Room.objects.select_for_update().get(
+                pk=original.room_id
+            )
+
+            stay = get_object_or_404(
+                Stay.objects.select_for_update(),
+                pk=pk,
+            )
+
+            if stay.status != expected_status:
+                raise ValidationError(
+                    {
+                        "detail": (
+                            f"Cannot {action} a stay with status "
+                            f"'{stay.status}'. Expected '{expected_status}'."
+                        )
+                    }
+                )
+
+            stay.status = new_status
+            updated_fields = ["status"]
+
+            if timestamp_field is not None:
+                setattr(stay, timestamp_field, timezone.now())
+                updated_fields.append(timestamp_field)
+
+            stay.save(update_fields=updated_fields)
+
+        return Response(StaySerializer(stay).data)    
