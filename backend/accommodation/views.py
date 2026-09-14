@@ -17,10 +17,17 @@ from rest_framework.views import APIView
 from rooms.models import Room
 from django.utils import timezone
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 
 class ApplicationListCreateView(generics.ListCreateAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [IsAuthenticated]
+
+    filterset_fields = ["status", "room", "move_in_date"]
+    search_fields = ["room__room_number"]
+    ordering_fields = ["id", "created_at", "move_in_date"]
+    ordering = ["-created_at", "-id"]    
 
     def get_queryset(self):
         return AccommodationApplication.objects.filter(
@@ -54,7 +61,14 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
 class StaffApplicationListView(generics.ListAPIView):
     queryset = AccommodationApplication.objects.all()
     serializer_class = ApplicationSerializer
-    permission_classes = [IsAdminUser]            
+    permission_classes = [IsAdminUser]        
+
+
+    filterset_fields = ["status", "room", "move_in_date"]
+    search_fields = ["room__room_number"]
+    ordering_fields = ["id", "created_at", "move_in_date"]
+    ordering = ["-created_at", "-id"]    
+
 
 
 class CancelApplicationView(APIView):
@@ -173,16 +187,39 @@ class MyStayListView(generics.ListAPIView):
     serializer_class = StaySerializer
     permission_classes = [IsAuthenticated]
 
+    filterset_fields = ["status", "room"]
+    search_fields = ["room__room_number"]
+    ordering_fields = [
+        "id",
+        "created_at",
+        "check_in_at",
+        "check_out_at",
+    ]
+    ordering = ["-created_at", "-id"]    
+
     def get_queryset(self):
         return Stay.objects.filter(resident=self.request.user)
 
 class StaffStayListView(generics.ListAPIView):
     queryset = Stay.objects.all()
     serializer_class = StaySerializer
-    permission_classes = [IsAdminUser]        
+    permission_classes = [IsAdminUser]   
+
+         
+    filterset_fields = ["status", "room"]
+    search_fields = ["room__room_number"]
+    ordering_fields = [
+        "id",
+        "created_at",
+        "check_in_at",
+        "check_out_at",
+    ]
+    ordering = ["-created_at", "-id"]    
 
 class StaffStayActionView(APIView):
     permission_classes = [IsAdminUser]
+
+    
 
     def post(self, request, pk, action):
         transitions = {
