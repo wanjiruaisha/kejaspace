@@ -40,4 +40,5 @@ urlpatterns = [
     path("api/", include("accommodation.urls")),
     path("api/", include("visitors.urls")),
     path("api/", include("payments.urls")),
+    path("api/admin/", include("users.admin_urls")),
 ]
