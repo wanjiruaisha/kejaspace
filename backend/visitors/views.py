@@ -12,11 +12,25 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import filters
+from rest_framework.generics import ListCreateAPIView
+
 
 
 class VisitorListCreateView(generics.ListCreateAPIView):
     serializer_class = VisitorSerializer
     permission_classes = [IsAuthenticated]
+
+    filterset_fields = ["status", "visit_date", "stay"]
+    search_fields = ["full_name", "stay__room__room_number"]
+    ordering_fields = ["id", "full_name", "visit_date", "created_at"]
+    ordering = ["-created_at", "-id"]    
+
+    filterset_fields = ["status", "visit_date", "stay"]
+    search_fields = ["full_name", "stay__room__room_number"]
+    ordering_fields = ["id", "full_name", "visit_date", "created_at"]
+    ordering = ["-created_at", "-id"]
+
 
     def get_queryset(self):
         return Visitor.objects.filter(
@@ -54,6 +68,19 @@ class StaffVisitorListView(generics.ListAPIView):
     ).all()
     serializer_class = VisitorSerializer
     permission_classes = [IsAdminUser]
+
+    filterset_fields = ["status", "visit_date", "stay"]
+    search_fields = ["full_name", "stay__room__room_number"]
+    ordering_fields = ["id", "full_name", "visit_date", "created_at"]
+    ordering = ["-created_at", "-id"]
+
+
+
+    filterset_fields = ["status", "visit_date", "stay"]
+    search_fields = ["full_name", "stay__room__room_number"]
+    ordering_fields = ["id", "full_name", "visit_date", "created_at"]
+    ordering = ["-created_at", "-id"]
+
 
 class StaffVisitorActionView(APIView):
     permission_classes = [IsAdminUser]
