@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Charge
+from .models import Charge, Payment
 
 
 class ChargeSerializer(serializers.ModelSerializer):
@@ -13,6 +13,8 @@ class ChargeSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    payment_summary = serializers.SerializerMethodField()
+
     class Meta:
         model = Charge
         fields = [
@@ -21,6 +23,7 @@ class ChargeSerializer(serializers.ModelSerializer):
             "resident_username",
             "room_number",
             "billing_month",
+            "payment_summary",
             "amount",
             "due_date",
             "created_by",
@@ -30,6 +33,7 @@ class ChargeSerializer(serializers.ModelSerializer):
             "id",
             "resident_username",
             "room_number",
+            "payment_summary",
             "created_by",
             "created_at",
         ]
@@ -51,3 +55,48 @@ class ChargeSerializer(serializers.ModelSerializer):
                 }
             )
         return attrs
+
+    def get_payment_summary(self, obj):
+        amount_paid = obj.get_amount_paid()
+        balance = obj.amount - amount_paid
+
+        if balance <= 0:
+            status = "paid"
+        elif amount_paid > 0:
+            status = "partially_paid"
+        else:
+            status = "unpaid"
+
+        return {
+            "amount_paid": format(amount_paid, ".2f"),
+            "balance": format(balance, ".2f"),
+            "status": status,
+        }    
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "charge",
+            "amount",
+            "method",
+            "reference",
+            "recorded_by",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class ManualPaymentSerializer(PaymentSerializer):
+    method = serializers.ChoiceField(
+        choices=["cash", "bank"]
+    )
+
+    class Meta(PaymentSerializer.Meta):
+        read_only_fields = [
+            "id",
+            "recorded_by",
+            "created_at",
+        ]    
