@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "accommodation",
     "visitors",
     "payments",
+    "django_filters",
 
     'rest_framework',
     'corsheaders',
@@ -149,4 +150,28 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+
+    "DEFAULT_PAGINATION_CLASS": (
+        "keja_project.pagination.StandardPagination"
+    ),
+
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "login_attempts": "5/minute",
+        "registration": "5/minute",
+        "token_refresh": "20/minute",
+    },
 }
