@@ -12,11 +12,24 @@ from .serializers import (
     PaymentSerializer,
     ManualPaymentSerializer,
 )
+from rest_framework import filters
+from rest_framework.generics import ListCreateAPIView
 
 
 class MyChargeListView(generics.ListAPIView):
     serializer_class = ChargeSerializer
     permission_classes = [IsAuthenticated]
+
+    filterset_fields = ["stay", "billing_month", "due_date"]
+    search_fields = ["stay__room__room_number"]
+    ordering_fields = [
+        "id",
+        "amount",
+        "billing_month",
+        "due_date",
+        "created_at",
+    ]
+    ordering = ["-billing_month", "-id"]    
 
     def get_queryset(self):
         return Charge.objects.filter(
@@ -31,6 +44,18 @@ class StaffChargeListCreateView(generics.ListCreateAPIView):
     ).all()
     serializer_class = ChargeSerializer
     permission_classes = [IsAdminUser]
+
+    filterset_fields = ["stay", "billing_month", "due_date"]
+    search_fields = ["stay__room__room_number"]
+    ordering_fields = [
+        "id",
+        "amount",
+        "billing_month",
+        "due_date",
+        "created_at",
+    ]
+    ordering = ["-billing_month", "-id"]
+
 
     def perform_create(self, serializer):
         with transaction.atomic():
@@ -73,6 +98,12 @@ class MyPaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
 
+    filterset_fields = ["charge", "method"]
+    search_fields = ["reference"]
+    ordering_fields = ["id", "amount", "created_at"]
+    ordering = ["-created_at", "-id"]
+
+
     def get_queryset(self):
         return Payment.objects.filter(
             charge__stay__resident=self.request.user
@@ -83,6 +114,12 @@ class StaffPaymentListView(generics.ListAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [IsAdminUser]
+
+
+    filterset_fields = ["charge", "method"]
+    search_fields = ["reference"]
+    ordering_fields = ["id", "amount", "created_at"]
+    ordering = ["-created_at", "-id"]    
 
 
 class RecordManualPaymentView(generics.CreateAPIView):
