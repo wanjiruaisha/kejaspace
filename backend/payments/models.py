@@ -90,3 +90,59 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.reference} - KES {self.amount}"         
+
+
+
+class MpesaPaymentAttempt(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("successful", "Successful"),
+        ("failed", "Failed"),
+        ("review", "Needs review"),
+    ]
+
+    charge = models.ForeignKey(
+        Charge,
+        on_delete=models.PROTECT,
+        related_name="mpesa_attempts",
+    )
+
+    phone_number = models.CharField(max_length=12)
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+
+    checkout_request_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+
+    result_description = models.TextField(blank=True)
+
+    payment = models.OneToOneField(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name="mpesa_attempt",
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"M-Pesa attempt {self.pk} - {self.status}"    
