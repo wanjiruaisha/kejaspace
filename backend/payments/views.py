@@ -1,20 +1,19 @@
-from django.db import transaction, IntegrityError
+from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 from accommodation.models import Stay
-from .models import Charge
-
+from rooms.models import Room
 from .models import Charge, Payment
 from .serializers import (
     ChargeSerializer,
     PaymentSerializer,
     ManualPaymentSerializer,
 )
-from rest_framework import filters
-from rest_framework.generics import ListCreateAPIView
-
 
 class MyChargeListView(generics.ListAPIView):
     serializer_class = ChargeSerializer
@@ -91,6 +90,7 @@ class StaffChargeListCreateView(generics.ListCreateAPIView):
             serializer.save(
                 stay=stay,
                 created_by=self.request.user,
+                is_initial_charge=False,
             )
 
 
@@ -128,31 +128,127 @@ class RecordManualPaymentView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         reference = serializer.validated_data["reference"]
+        selected_charge = serializer.validated_data["charge"]
+
+        original_stay = Stay.objects.get(
+            pk=selected_charge.stay_id
+        )
 
         try:
             with transaction.atomic():
+                get_user_model().objects.select_for_update().get(
+                    pk=original_stay.resident_id
+                )
+
+                Room.objects.select_for_update().get(
+                    pk=original_stay.room_id
+                )
+
+                stay = Stay.objects.select_for_update().get(
+                    pk=original_stay.pk
+                )
+
                 charge = Charge.objects.select_for_update().get(
-                    pk=serializer.validated_data["charge"].pk
+                    pk=selected_charge.pk,
+                    stay=stay,
                 )
 
                 amount_paid = charge.get_amount_paid()
                 balance = charge.amount - amount_paid
                 amount = serializer.validated_data["amount"]
 
-                if amount > balance:
+                if balance <= 0:
                     raise ValidationError(
-                        {
-                            "amount": (
-                                f"Payment cannot exceed the remaining "
-                                f"balance of KES {balance:.2f}."
-                            )
-                        }
+                        {"detail": "This charge is already fully paid."}
                     )
+
+                if charge.is_initial_rent:
+                    if stay.status != "awaiting_payment":
+                        raise ValidationError(
+                            {
+                                "detail": (
+                                    "Initial rent can only confirm a stay "
+                                    "that is awaiting payment."
+                                )
+                            }
+                        )
+
+                    if stay.payment_deadline is None:
+                        raise ValidationError(
+                            {
+                                "detail": (
+                                    "This stay has no payment deadline. "
+                                    "An administrator must review it."
+                                )
+                            }
+                        )
+
+                    if stay.payment_deadline <= timezone.now():
+                        raise ValidationError(
+                            {
+                                "detail": (
+                                    "The payment hold has expired. "
+                                    "Staff must arrange a new allocation "
+                                    "before accepting payment for it."
+                                )
+                            }
+                        )
+
+                    if amount_paid > 0:
+                        raise ValidationError(
+                            {
+                                "detail": (
+                                    "This initial charge already has a "
+                                    "partial payment and needs "
+                                    "administrator review."
+                                )
+                            }
+                        )
+
+                    if amount != charge.amount:
+                        raise ValidationError(
+                            {
+                                "amount": (
+                                    "Pay the full first month's rent "
+                                    f"of KES {charge.amount:.2f} "
+                                    "in one payment."
+                                )
+                            }
+                        )
+
+                else:
+                    if stay.status not in [
+                        "reserved",
+                        "checked_in",
+                        "checked_out",
+                    ]:
+                        raise ValidationError(
+                            {
+                                "detail": (
+                                    "Ordinary rent payments are not "
+                                    "accepted for this stay's status."
+                                )
+                            }
+                        )
+
+                    if amount > balance:
+                        raise ValidationError(
+                            {
+                                "amount": (
+                                    "Payment cannot exceed the remaining "
+                                    f"balance of KES {balance:.2f}."
+                                )
+                            }
+                        )
 
                 serializer.save(
                     charge=charge,
                     recorded_by=self.request.user,
                 )
+
+                if charge.is_initial_rent:
+                    stay.status = "reserved"
+                    stay.save(update_fields=["status"])
 
         except IntegrityError:
             if Payment.objects.filter(reference=reference).exists():
@@ -163,4 +259,4 @@ class RecordManualPaymentView(generics.CreateAPIView):
                         )
                     }
                 )
-            raise            
+            raise
