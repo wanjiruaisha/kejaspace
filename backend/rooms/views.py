@@ -6,6 +6,10 @@ from rest_framework.permissions import AllowAny
 from .models import Room
 from .serializers import RoomSerializer
 
+from users.permissions import IsSystemAdmin
+from .serializers import AdminRoomSerializer
+
+
 
 class RoomListView(generics.ListAPIView):
     queryset = Room.objects.filter(is_active=True)
@@ -33,3 +37,22 @@ class RoomDetailView(generics.RetrieveAPIView):
     queryset = Room.objects.filter(is_active=True)
     serializer_class = RoomSerializer
     permission_classes = [AllowAny]
+
+
+class AdminRoomListCreateView(generics.ListCreateAPIView):
+    queryset = Room.objects.all()
+    serializer_class = AdminRoomSerializer
+    permission_classes = [IsSystemAdmin]
+
+    filterset_fields = ["capacity", "is_active"]
+    search_fields = ["room_number", "description"]
+    ordering_fields = ["id", "room_number", "monthly_price"]
+    ordering = ["room_number", "id"]
+
+
+class AdminRoomUpdateView(generics.UpdateAPIView):
+    queryset = Room.objects.all()
+    serializer_class = AdminRoomSerializer
+    permission_classes = [IsSystemAdmin]
+    http_method_names = ["patch", "options"]
+    filter_backends = []    
