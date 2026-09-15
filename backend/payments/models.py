@@ -146,3 +146,24 @@ class MpesaPaymentAttempt(models.Model):
 
     def __str__(self):
         return f"M-Pesa attempt {self.pk} - {self.status}"    
+
+class MpesaCallbackEvent(models.Model):
+    checkout_request_id = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    payload = models.JSONField()
+
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    processed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-received_at", "-id"]
+
+    def __str__(self):
+        return f"Callback {self.pk} - {self.checkout_request_id}"        
