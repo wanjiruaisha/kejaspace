@@ -9,6 +9,9 @@ from .serializers import RoomSerializer
 from users.permissions import IsSystemAdmin
 from .serializers import AdminRoomSerializer
 
+from django.db.models.deletion import ProtectedError
+from rest_framework.exceptions import ValidationError
+
 
 
 class RoomListView(generics.ListAPIView):
@@ -50,9 +53,22 @@ class AdminRoomListCreateView(generics.ListCreateAPIView):
     ordering = ["room_number", "id"]
 
 
-class AdminRoomUpdateView(generics.UpdateAPIView):
+class AdminRoomUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = AdminRoomSerializer
     permission_classes = [IsSystemAdmin]
-    http_method_names = ["patch", "options"]
-    filter_backends = []    
+    http_method_names = ["get", "patch", "delete", "options"]
+    filter_backends = []
+
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise ValidationError(
+                {
+                    "detail": (
+                        "This room has related records and cannot be deleted. "
+                        "Deactivate it instead by setting is_active to false."
+                    )
+                }
+            )
