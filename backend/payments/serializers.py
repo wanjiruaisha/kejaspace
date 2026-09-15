@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 from .models import Charge, Payment
 
+import re
+
 
 class ChargeSerializer(serializers.ModelSerializer):
     resident_username = serializers.CharField(
@@ -102,3 +104,38 @@ class ManualPaymentSerializer(PaymentSerializer):
             "recorded_by",
             "created_at",
         ]    
+
+
+class MpesaInitiateSerializer(serializers.Serializer):
+    charge = serializers.PrimaryKeyRelatedField(
+        queryset=Charge.objects.none()
+    )
+
+    phone_number = serializers.CharField(max_length=20)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get("request")
+
+        if request and request.user.is_authenticated:
+            self.fields["charge"].queryset = Charge.objects.filter(
+                stay__resident=request.user
+            )
+
+    def validate_phone_number(self, value):
+        phone = value.strip().replace(" ", "")
+
+        if phone.startswith("+"):
+            phone = phone[1:]
+
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+
+        if not re.fullmatch(r"254[17][0-9]{8}", phone):
+            raise serializers.ValidationError(
+                "Enter a Kenyan mobile number, "
+                "for example 0712345678 or 254712345678."
+            )
+
+        return phone        
