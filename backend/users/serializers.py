@@ -52,3 +52,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "phone_number",
             
         ]        
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField()        
