@@ -46,10 +46,12 @@ class AccommodationApplication(models.Model):
         return f"{self.applicant} - {self.room} - {self.status}"
 class Stay(models.Model):
     STATUS_CHOICES = [
+        ("awaiting_payment", "Awaiting payment"),
         ("reserved", "Reserved"),
         ("checked_in", "Checked in"),
         ("checked_out", "Checked out"),
         ("cancelled", "Cancelled"),
+        ("expired", "Expired"),
     ]
 
     application = models.OneToOneField(
@@ -73,7 +75,12 @@ class Stay(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="reserved",
+        default="awaiting_payment",
+    )
+
+    payment_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
     )
 
     check_in_at = models.DateTimeField(null=True, blank=True)
@@ -82,16 +89,20 @@ class Stay(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at", "-id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["resident"],
                 condition=models.Q(
-                    status__in=["reserved", "checked_in"]
+                    status__in=[
+                        "awaiting_payment",
+                        "reserved",
+                        "checked_in",
+                    ]
                 ),
                 name="one_active_stay_per_resident",
             )
         ]
 
     def __str__(self):
-        return f"{self.resident} - {self.room} - {self.status}"        
+        return f"{self.resident} - {self.room} - {self.status}"
