@@ -13,6 +13,7 @@ class Charge(models.Model):
         related_name="charges",
     )
     billing_month = models.DateField()
+    is_initial_rent = models.BooleanField(default=False)
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -33,7 +34,12 @@ class Charge(models.Model):
                 fields=["stay", "billing_month"],
                 name="one_rent_charge_per_stay_month",
             ),
-        ]
+            models.UniqueConstraint(
+                fields=["stay"],
+                condition=models.Q(is_initial_rent=True),
+                name="one_initial_rent_charge_per_stay",
+            ),
+        ]    
 
     def __str__(self):
         return f"Stay {self.stay_id} - {self.billing_month:%Y-%m}"
