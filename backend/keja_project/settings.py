@@ -46,7 +46,9 @@ INSTALLED_APPS = [
     "accommodation",
     "visitors",
     "payments",
+    "maintenance",
     "django_filters",
+    
 
     'rest_framework',
     'corsheaders',
