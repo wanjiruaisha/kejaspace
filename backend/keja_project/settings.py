@@ -22,6 +22,10 @@ MPESA_ENVIRONMENT = os.getenv("MPESA_ENVIRONMENT", "sandbox")
 MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY", "")
 MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET", "")
 
+MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "")
+MPESA_PASSKEY = os.getenv("MPESA_PASSKEY", "")
+MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL", "")
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -33,8 +37,11 @@ SECRET_KEY = 'django-insecure-)hbs6uh&d#2*0etcj#hp8%&m#w#ryacnv7-3pxulr916d^4%-5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "irritably-blooming-endpoint.ngrok-free.dev",
+]
 
 # Application definition
 
