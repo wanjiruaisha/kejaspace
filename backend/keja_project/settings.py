@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "visitors",
     "payments",
     "maintenance",
+    "announcements",
     "django_filters",
     
 
