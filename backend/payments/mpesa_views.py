@@ -16,6 +16,13 @@ from .models import Charge, MpesaPaymentAttempt
 from .mpesa import get_mpesa_access_token, send_stk_push
 from .serializers import MpesaInitiateSerializer
 
+from rest_framework.parsers import JSONParser
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+
+from .models import MpesaCallbackEvent
+from .serializers import MpesaCallbackSerializer
+
 
 class InitiateMpesaPaymentView(generics.GenericAPIView):
     serializer_class = MpesaInitiateSerializer
@@ -210,3 +217,28 @@ class InitiateMpesaPaymentView(generics.GenericAPIView):
             },
             status=202,
         )
+
+
+class MpesaCallbackView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        serializer = MpesaCallbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        callback = serializer.validated_data["Body"]["stkCallback"]
+
+        MpesaCallbackEvent.objects.create(
+            checkout_request_id=callback["CheckoutRequestID"],
+            payload=serializer.validated_data,
+        )
+
+        return Response(
+            {
+                "ResultCode": 0,
+                "ResultDesc": "Callback received",
+            },
+            status=200,
+        )    
