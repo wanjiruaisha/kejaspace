@@ -43,10 +43,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
 class StaySerializer(serializers.ModelSerializer):
     room_number = serializers.CharField(
-    source="room.room_number",
-    read_only=True,
+        source="room.room_number",
+        read_only=True,
     )
-    
+
     class Meta:
         model = Stay
         fields = [
@@ -56,8 +56,9 @@ class StaySerializer(serializers.ModelSerializer):
             "room",
             "room_number",
             "status",
+            "payment_deadline",
             "check_in_at",
             "check_out_at",
             "created_at",
         ]
-        read_only_fields = fields    
+        read_only_fields = fields
