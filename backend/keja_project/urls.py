@@ -22,6 +22,11 @@ from rest_framework_simplejwt.views import (
 )
 from payments.mpesa_views import InitiateMpesaPaymentView
 
+from payments.mpesa_views import (
+    InitiateMpesaPaymentView,
+    MpesaCallbackView,
+)
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -49,5 +54,10 @@ urlpatterns = [
     "api/payments/mpesa/initiate/",
     InitiateMpesaPaymentView.as_view(),
     name="mpesa-initiate",
-),
+    ),
+    path(
+        "api/payments/mpesa/callback/",
+        MpesaCallbackView.as_view(),
+        name="mpesa-callback",
+    ),
 ]
