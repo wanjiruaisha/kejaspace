@@ -138,4 +138,21 @@ class MpesaInitiateSerializer(serializers.Serializer):
                 "for example 0712345678 or 254712345678."
             )
 
-        return phone        
+        return phone
+
+
+class MpesaCallbackDetailsSerializer(serializers.Serializer):
+    MerchantRequestID = serializers.CharField(max_length=100)
+    CheckoutRequestID = serializers.CharField(max_length=100)
+    ResultCode = serializers.IntegerField()
+    ResultDesc = serializers.CharField(max_length=2000)
+
+    CallbackMetadata = serializers.JSONField(required=False)
+
+
+class MpesaCallbackBodySerializer(serializers.Serializer):
+    stkCallback = MpesaCallbackDetailsSerializer()
+
+
+class MpesaCallbackSerializer(serializers.Serializer):
+    Body = MpesaCallbackBodySerializer()            
