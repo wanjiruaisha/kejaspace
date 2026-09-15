@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
 from .models import Room
+from django.db.models import Q
+from django.utils import timezone
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -20,10 +22,14 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_available_spaces(self, obj):
         used_spaces = obj.stays.filter(
-            status__in=["reserved", "checked_in"]
+            Q(status__in=["reserved", "checked_in"])
+            | Q(
+                status="awaiting_payment",
+                payment_deadline__gt=timezone.now(),
+            )
         ).count()
 
-        return max(obj.capacity - used_spaces, 0)
+        return max(obj.capacity - used_spaces, 0)    
 
 class AdminRoomSerializer(serializers.ModelSerializer):
     class Meta:
