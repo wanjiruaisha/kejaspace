@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from payments.mpesa_views import InitiateMpesaPaymentView
 
 
 urlpatterns = [
@@ -44,4 +45,9 @@ urlpatterns = [
     path("api/admin/", include("rooms.admin_urls")),
     path("api/", include("maintenance.urls")),
     path("api/", include("announcements.urls")),
+    path(
+    "api/payments/mpesa/initiate/",
+    InitiateMpesaPaymentView.as_view(),
+    name="mpesa-initiate",
+),
 ]
