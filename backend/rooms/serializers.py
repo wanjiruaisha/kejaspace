@@ -24,3 +24,24 @@ class RoomSerializer(serializers.ModelSerializer):
         ).count()
 
         return max(obj.capacity - used_spaces, 0)
+
+class AdminRoomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = [
+            "id",
+            "room_number",
+            "capacity",
+            "monthly_price",
+            "description",
+            "is_active",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_capacity(self, value):
+        if self.instance is not None:
+            if value != self.instance.capacity:
+                raise serializers.ValidationError(
+                    "Room capacity cannot be changed after creation."
+                )
+        return value    
