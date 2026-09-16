@@ -1,4 +1,7 @@
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -26,6 +29,7 @@ from .serializers import MpesaCallbackSerializer
 from django.shortcuts import get_object_or_404
 
 from .mpesa import query_stk_status
+from .mpesa_services import apply_verified_mpesa_result
 
 
 
@@ -148,7 +152,16 @@ class InitiateMpesaPaymentView(generics.GenericAPIView):
                 amount=amount,
                 charge_id=charge.pk,
             )
-        except (requests.RequestException, ValueError):
+        except (requests.RequestException, ValueError) as exc:
+            logger.error(
+                "STK attempt %s failed: %s",
+                attempt.pk,
+                type(exc).__name__,
+            )
+
+            if isinstance(exc, ValueError):
+                logger.error("STK validation error: %s", exc)
+
             attempt.status = "review"
             attempt.result_description = (
                 "Could not establish whether Safaricom accepted the request."
@@ -167,7 +180,7 @@ class InitiateMpesaPaymentView(generics.GenericAPIView):
                     "attempt_id": attempt.pk,
                 },
                 status=502,
-            )
+            )        
 
         checkout_id = result.get("CheckoutRequestID")
 
@@ -275,7 +288,12 @@ class VerifyMpesaPaymentView(APIView):
             result = query_stk_status(
                 attempt.checkout_request_id
             )
-        except (requests.RequestException, ValueError):
+        except (requests.RequestException, ValueError) as exc:
+            logger.error(
+                "STK verification failed: %s",
+                type(exc).__name__,
+            )        
+            print("STK PUSH ERROR:", repr(exc))    
             return Response(
                 {
                     "detail": (
@@ -321,20 +339,18 @@ class VerifyMpesaPaymentView(APIView):
                 status=202,
             )
 
-        result_code = int(result_code)
+        try:
+            outcome = apply_verified_mpesa_result(
+                attempt_id=attempt.pk,
+                provider_result=result,
+            )
+        except ValueError:
+            return Response(
+                {"detail": "The payment result could not be safely applied."},
+                status=502,
+            )
 
-        return Response(
-            {
-                "attempt_id": attempt.pk,
-                "provider_status": (
-                    "successful" if result_code == 0 else "unsuccessful"
-                ),
-                "result_code": result_code,
-                "result_description": result.get("ResultDesc", ""),
-                "payment_recorded": attempt.payment_id is not None,
-            },
-            status=200,
-        )        
+        return Response(outcome, status=200)            
 
 
 
