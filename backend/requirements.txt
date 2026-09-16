@@ -6,6 +6,7 @@ django-cors-headers==4.9.0
 django-filter==26.1
 djangorestframework==3.18.0
 djangorestframework_simplejwt==5.5.1
+gunicorn==26.2.0
 idna==3.19
 psycopg==3.3.5
 psycopg-binary==3.3.5
@@ -16,3 +17,4 @@ sqlparse==0.6.0
 typing_extensions==4.16.0
 tzdata==2026.3
 urllib3==2.7.0
+whitenoise==6.12.0
