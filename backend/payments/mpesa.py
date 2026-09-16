@@ -1,6 +1,10 @@
 import requests
 from django.conf import settings
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 import base64
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -84,15 +88,37 @@ def send_stk_push(*, access_token, phone_number, amount, charge_id):
         timeout=20,
     )
 
-    response.raise_for_status()
+    logger.warning(
+        "STK response HTTP status: %s",
+        response.status_code,
+    )
 
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError:
+        logger.error(
+            "STK response was not JSON. Content type: %s",
+            response.headers.get("Content-Type", "unknown"),
+        )
+        response.raise_for_status()
+        raise ValueError("Safaricom returned a non-JSON response.")
+
+    if isinstance(data, dict):
+        logger.warning(
+            "STK response: errorCode=%s; errorMessage=%s; "
+            "ResponseCode=%s; ResponseDescription=%s",
+            data.get("errorCode"),
+            data.get("errorMessage"),
+            data.get("ResponseCode"),
+            data.get("ResponseDescription"),
+        )
+
+    response.raise_for_status()
 
     if not isinstance(data, dict):
         raise ValueError("Unexpected response from Safaricom.")
 
-    return data
-
+    return data    
 
 def query_stk_status(checkout_request_id):
     if settings.MPESA_ENVIRONMENT != "sandbox":
@@ -128,11 +154,35 @@ def query_stk_status(checkout_request_id):
         timeout=20,
     )
 
-    response.raise_for_status()
+    logger.warning(
+        "STK query HTTP status: %s",
+        response.status_code,
+    )
 
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError:
+        logger.error(
+            "STK query returned non-JSON. Content type: %s",
+            response.headers.get("Content-Type", "unknown"),
+        )
+        response.raise_for_status()
+        raise ValueError("Safaricom returned a non-JSON query response.")
+
+    if isinstance(data, dict):
+        logger.warning(
+            "STK query: errorCode=%s; errorMessage=%s; "
+            "ResponseCode=%s; ResultCode=%s; ResultDesc=%s",
+            data.get("errorCode"),
+            data.get("errorMessage"),
+            data.get("ResponseCode"),
+            data.get("ResultCode"),
+            data.get("ResultDesc"),
+        )
+
+    response.raise_for_status()
 
     if not isinstance(data, dict):
         raise ValueError("Unexpected response from Safaricom.")
 
-    return data
+    return data    
