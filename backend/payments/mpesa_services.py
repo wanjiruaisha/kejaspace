@@ -96,8 +96,9 @@ def apply_verified_mpesa_result(attempt_id, provider_result):
         if result_code != 0:
             return finish(
                 "failed",
-                "Safaricom reported an unsuccessful payment.",
-            )
+                f"Safaricom result {result_code}: "
+                f"{provider_result.get('ResultDesc') or 'No explanation provided.'}",
+            )       
 
         # Keep successful but unresolved payments for staff review.
         if previously_successful and attempt.status == "review":
