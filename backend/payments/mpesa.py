@@ -92,3 +92,47 @@ def send_stk_push(*, access_token, phone_number, amount, charge_id):
         raise ValueError("Unexpected response from Safaricom.")
 
     return data
+
+
+def query_stk_status(checkout_request_id):
+    if settings.MPESA_ENVIRONMENT != "sandbox":
+        raise ValueError("Only sandbox payments are configured.")
+
+    shortcode = settings.MPESA_SHORTCODE
+    passkey = settings.MPESA_PASSKEY
+
+    if not shortcode or not passkey:
+        raise ValueError("M-Pesa payment settings are incomplete.")
+
+    access_token = get_mpesa_access_token()
+
+    timestamp = datetime.now(
+        ZoneInfo("Africa/Nairobi")
+    ).strftime("%Y%m%d%H%M%S")
+
+    password = base64.b64encode(
+        f"{shortcode}{passkey}{timestamp}".encode("utf-8")
+    ).decode("utf-8")
+
+    response = requests.post(
+        "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+        json={
+            "BusinessShortCode": shortcode,
+            "Password": password,
+            "Timestamp": timestamp,
+            "CheckoutRequestID": checkout_request_id,
+        },
+        timeout=20,
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    if not isinstance(data, dict):
+        raise ValueError("Unexpected response from Safaricom.")
+
+    return data
