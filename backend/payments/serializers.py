@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Charge, Payment
+from .models import Charge, Payment, MpesaPaymentAttempt
 
 import re
 
@@ -156,3 +157,46 @@ class MpesaCallbackBodySerializer(serializers.Serializer):
 
 class MpesaCallbackSerializer(serializers.Serializer):
     Body = MpesaCallbackBodySerializer()            
+
+class StaffMpesaAttemptSerializer(serializers.ModelSerializer):
+    resident_name = serializers.SerializerMethodField()
+
+    room_number = serializers.CharField(
+        source="charge.stay.room.room_number",
+        read_only=True,
+    )
+
+    provider_result_code = serializers.SerializerMethodField()
+    provider_result_description = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MpesaPaymentAttempt
+        fields = [
+            "id",
+            "charge",
+            "resident_name",
+            "room_number",
+            "amount",
+            "status",
+            "result_description",
+            "provider_result_code",
+            "provider_result_description",
+            "payment",
+            "created_at",
+            "verified_at",
+        ]
+        read_only_fields = fields
+
+    def get_resident_name(self, obj):
+        resident = obj.charge.stay.resident
+
+        return (
+            resident.get_full_name().strip()
+            or resident.username
+        )
+
+    def get_provider_result_code(self, obj):
+        return obj.verification_result.get("ResultCode")
+
+    def get_provider_result_description(self, obj):
+        return obj.verification_result.get("ResultDesc")    
