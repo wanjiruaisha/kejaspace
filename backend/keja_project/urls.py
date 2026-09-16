@@ -26,6 +26,13 @@ from payments.mpesa_views import (
     InitiateMpesaPaymentView,
     MpesaCallbackView,
 )
+from payments.mpesa_views import (
+    InitiateMpesaPaymentView,
+    MpesaCallbackView,
+    VerifyMpesaPaymentView,
+)
+
+
 
 
 urlpatterns = [
@@ -60,4 +67,10 @@ urlpatterns = [
         MpesaCallbackView.as_view(),
         name="mpesa-callback",
     ),
+    path(
+    "api/payments/mpesa/attempts/<int:pk>/verify/",
+    VerifyMpesaPaymentView.as_view(),
+    name="mpesa-verify",
+),
+    
 ]
