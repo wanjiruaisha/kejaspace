@@ -141,6 +141,16 @@ class MpesaPaymentAttempt(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    verification_result = models.JSONField(
+    default=dict,
+    blank=True,
+    )
+
+    verified_at = models.DateTimeField(
+    null=True,
+    blank=True,
+    )
+    
     class Meta:
         ordering = ["-created_at", "-id"]
 
