@@ -23,6 +23,11 @@ from rest_framework.views import APIView
 from .models import MpesaCallbackEvent
 from .serializers import MpesaCallbackSerializer
 
+from django.shortcuts import get_object_or_404
+
+from .mpesa import query_stk_status
+
+
 
 class InitiateMpesaPaymentView(generics.GenericAPIView):
     serializer_class = MpesaInitiateSerializer
@@ -241,4 +246,96 @@ class MpesaCallbackView(APIView):
                 "ResultDesc": "Callback received",
             },
             status=200,
-        )    
+        )
+
+
+
+class VerifyMpesaPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        attempts = MpesaPaymentAttempt.objects.filter(
+            charge__stay__resident=request.user
+        )
+
+        attempt = get_object_or_404(attempts, pk=pk)
+
+        if not attempt.checkout_request_id:
+            return Response(
+                {
+                    "detail": (
+                        "This attempt has no checkout ID yet. "
+                        "Its request outcome may need review."
+                    )
+                },
+                status=409,
+            )
+
+        try:
+            result = query_stk_status(
+                attempt.checkout_request_id
+            )
+        except (requests.RequestException, ValueError):
+            return Response(
+                {
+                    "detail": (
+                        "Could not check the payment with Safaricom. "
+                        "This does not mean the payment failed."
+                    )
+                },
+                status=502,
+            )
+
+        if str(result.get("ResponseCode")) != "0":
+            return Response(
+                {
+                    "attempt_id": attempt.pk,
+                    "provider_status": "unknown",
+                    "detail": "Safaricom has not supplied a usable result.",
+                },
+                status=202,
+            )
+
+        if (
+            result.get("CheckoutRequestID")
+            != attempt.checkout_request_id
+        ):
+            return Response(
+                {"detail": "Safaricom returned a mismatched checkout ID."},
+                status=502,
+            )
+
+        result_code = result.get("ResultCode")
+
+        if (
+            isinstance(result_code, bool)
+            or not isinstance(result_code, (str, int))
+            or not str(result_code).isdigit()
+        ):
+            return Response(
+                {
+                    "attempt_id": attempt.pk,
+                    "provider_status": "unknown",
+                    "detail": "A final payment result is not available.",
+                },
+                status=202,
+            )
+
+        result_code = int(result_code)
+
+        return Response(
+            {
+                "attempt_id": attempt.pk,
+                "provider_status": (
+                    "successful" if result_code == 0 else "unsuccessful"
+                ),
+                "result_code": result_code,
+                "result_description": result.get("ResultDesc", ""),
+                "payment_recorded": attempt.payment_id is not None,
+            },
+            status=200,
+        )        
+
+
+
+
