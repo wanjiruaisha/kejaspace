@@ -60,7 +60,9 @@ INSTALLED_APPS = [
     "payments",
     "maintenance",
     "announcements",
+    "dashboard",
     "django_filters",
+
     
 
     'rest_framework',
