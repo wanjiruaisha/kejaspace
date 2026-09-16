@@ -41,7 +41,7 @@ from dashboard.views import (
     OccupancyReportView,
     PaymentReportView,
 )
-
+from payments.mpesa_views import StaffMpesaAttemptListView
 
 
 urlpatterns = [
@@ -96,6 +96,10 @@ urlpatterns = [
     PaymentReportView.as_view(),
     name="payment-report",
     ),
-    
+    path(
+    "api/staff/payments/mpesa/attempts/",
+    StaffMpesaAttemptListView.as_view(),
+    name="staff-mpesa-attempt-list",
+),
 
 ]
