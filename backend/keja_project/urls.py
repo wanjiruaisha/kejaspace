@@ -31,7 +31,16 @@ from payments.mpesa_views import (
     MpesaCallbackView,
     VerifyMpesaPaymentView,
 )
-
+from dashboard.views import StaffDashboardView
+from dashboard.views import (
+    StaffDashboardView,
+    OccupancyReportView,
+)
+from dashboard.views import (
+    StaffDashboardView,
+    OccupancyReportView,
+    PaymentReportView,
+)
 
 
 
@@ -71,6 +80,22 @@ urlpatterns = [
     "api/payments/mpesa/attempts/<int:pk>/verify/",
     VerifyMpesaPaymentView.as_view(),
     name="mpesa-verify",
-),
+    ),
+    path(
+    "api/staff/dashboard/",
+    StaffDashboardView.as_view(),
+    name="staff-dashboard",
+    ),
+    path(
+    "api/staff/reports/occupancy/",
+    OccupancyReportView.as_view(),
+    name="occupancy-report",
+    ),
+    path(
+    "api/staff/reports/payments/",
+    PaymentReportView.as_view(),
+    name="payment-report",
+    ),
     
+
 ]
