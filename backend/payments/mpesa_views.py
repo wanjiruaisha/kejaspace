@@ -7,6 +7,12 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+from rest_framework.permissions import IsAdminUser
+
+from .serializers import StaffMpesaAttemptSerializer
+
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -350,7 +356,35 @@ class VerifyMpesaPaymentView(APIView):
                 status=502,
             )
 
-        return Response(outcome, status=200)            
+        return Response(outcome, status=200)   
+
+
+class StaffMpesaAttemptListView(generics.ListAPIView):
+    serializer_class = StaffMpesaAttemptSerializer
+    permission_classes = [IsAdminUser]
+
+    queryset = MpesaPaymentAttempt.objects.select_related(
+        "charge__stay__resident",
+        "charge__stay__room",
+    )
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+
+    filterset_fields = ["status", "charge"]
+
+    search_fields = [
+        "charge__stay__resident__username",
+        "charge__stay__resident__first_name",
+        "charge__stay__resident__last_name",
+        "charge__stay__room__room_number",
+    ]
+
+    ordering_fields = ["id", "created_at", "amount"]
+    ordering = ["-created_at", "-id"]             
 
 
 
