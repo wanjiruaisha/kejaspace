@@ -6,6 +6,7 @@ import RoomsPage from "./pages/RoomsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import RoomDetailsPage from "./pages/RoomDetailsPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import LoginPage from "./pages/auth/LoginPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="rooms/:id" element={<RoomDetailsPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="login" element={<LoginPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
