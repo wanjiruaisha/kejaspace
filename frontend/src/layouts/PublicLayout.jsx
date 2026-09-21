@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router";
 import useAuth from "../hooks/useAuth";
+import LogoutButton from "../components/auth/LogoutButton";
 
 export default function PublicLayout() {
   const { user, authLoading, authError } = useAuth();
@@ -40,9 +41,13 @@ export default function PublicLayout() {
                 Checking session…
               </span>
             ) : user ? (
-              <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                Hi, {user.username}
-              </span>
+              <>
+                <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  Hi, {user.username}
+                </span>
+
+                <LogoutButton />
+              </>
             ) : (
               <>
                 <NavLink to="/login" className={linkStyle}>
