@@ -132,15 +132,15 @@ export default function RegisterPage() {
         </h1>
 
         <p className="mt-4 leading-7 text-slate-600">
-          Your account has been created. You’ll need to log in before
-          applying for accommodation.
+          Your account has been created. You’ll need to log in before applying
+          for accommodation.
         </p>
 
         <Link
-          to="/rooms"
+          to="/login"
           className="mt-6 inline-block rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
         >
-          Browse rooms
+          Continue to login
         </Link>
       </section>
     );
@@ -170,8 +170,7 @@ export default function RegisterPage() {
               <li key={field}>
                 {field !== "detail" && field !== "non_field_errors" && (
                   <span className="font-semibold">
-                    {fields.find((item) => item.name === field)?.label ||
-                      field}
+                    {fields.find((item) => item.name === field)?.label || field}
                     :{" "}
                   </span>
                 )}
@@ -198,7 +197,8 @@ export default function RegisterPage() {
                 {field.label}
                 {field.name === "phone_number" && (
                   <span className="font-normal text-slate-500">
-                    {" "}(optional)
+                    {" "}
+                    (optional)
                   </span>
                 )}
               </label>
