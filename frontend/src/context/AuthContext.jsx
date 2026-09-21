@@ -1,6 +1,9 @@
 import { createContext, useEffect, useState } from "react";
-import { getCurrentUser, loginRequest } from "../services/authService";
-
+import {
+  getCurrentUser,
+  loginRequest,
+  logoutRequest,
+} from "../services/authService";
 export const AuthContext = createContext(null);
 
 export default function AuthProvider({ children }) {
@@ -22,7 +25,7 @@ export default function AuthProvider({ children }) {
       try {
         const currentUser = await getCurrentUser(
           accessToken,
-          controller.signal
+          controller.signal,
         );
 
         if (!controller.signal.aborted) {
@@ -37,7 +40,7 @@ export default function AuthProvider({ children }) {
           setAuthError("Your session has expired. Please log in again.");
         } else {
           setAuthError(
-            "We couldn’t check your saved session. Please reload or log in again."
+            "We couldn’t check your saved session. Please reload or log in again.",
           );
         }
       } finally {
@@ -65,12 +68,30 @@ export default function AuthProvider({ children }) {
 
     return currentUser;
   }
+  async function logout() {
+    const accessToken = sessionStorage.getItem("access_token");
+    const refreshToken = sessionStorage.getItem("refresh_token");
+
+    if (!accessToken || !refreshToken) {
+      throw new Error(
+        "Your session is incomplete. Reload the page and log in again.",
+      );
+    }
+
+    await logoutRequest(accessToken, refreshToken);
+
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("refresh_token");
+
+    setUser(null);
+    setAuthError("");
+  }
 
   return (
-    <AuthContext.Provider
-      value={{ user, login, authLoading, authError }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  <AuthContext.Provider
+    value={{ user, login, logout, authLoading, authError }}
+  >
+    {children}
+  </AuthContext.Provider>
+);
 }
