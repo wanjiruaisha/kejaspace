@@ -49,3 +49,24 @@ export async function getCurrentUser(accessToken, signal) {
 
   return data;
 }
+
+export async function logoutRequest(accessToken, refreshToken) {
+  const response = await fetch(`${API_BASE_URL}/auth/logout/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      refresh: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(
+      data?.detail || "Could not complete logout. Please try again."
+    );
+  }
+}
