@@ -1,6 +1,8 @@
 import { Link, NavLink, Outlet } from "react-router";
+import useAuth from "../hooks/useAuth";
 
 export default function PublicLayout() {
+  const { user, authLoading, authError } = useAuth();
   const linkStyle = ({ isActive }) =>
     `rounded-full px-4 py-2 text-sm font-semibold transition ${
       isActive
@@ -33,17 +35,41 @@ export default function PublicLayout() {
             <NavLink to="/rooms" className={linkStyle}>
               Rooms
             </NavLink>
-            <Link
-              to="/register"
-              className="rounded-full bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-            >
-              Sign up
-            </Link>
+            {authLoading ? (
+              <span className="px-3 text-sm text-slate-500">
+                Checking session…
+              </span>
+            ) : user ? (
+              <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                Hi, {user.username}
+              </span>
+            ) : (
+              <>
+                <NavLink to="/login" className={linkStyle}>
+                  Log in
+                </NavLink>
+
+                <Link
+                  to="/register"
+                  className="rounded-full bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </header>
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-8 sm:px-8 sm:py-12">
+        {authError && (
+          <p
+            role="alert"
+            className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            {authError}
+          </p>
+        )}
         <Outlet />
       </main>
 
