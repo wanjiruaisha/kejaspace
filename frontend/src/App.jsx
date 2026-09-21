@@ -4,6 +4,7 @@ import PublicLayout from "./layouts/PublicLayout";
 import HomePage from "./pages/HomePage";
 import RoomsPage from "./pages/RoomsPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import RoomDetailsPage from "./pages/RoomDetailsPage";
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route index element={<HomePage />} />
         <Route path="rooms" element={<RoomsPage />} />
+        <Route path="rooms/:id" element={<RoomDetailsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
