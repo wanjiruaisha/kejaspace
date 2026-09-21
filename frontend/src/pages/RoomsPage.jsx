@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -59,14 +60,14 @@ export default function RoomsPage() {
       try {
         const response = await fetch(
           `${API_BASE_URL}/rooms/?${params.toString()}`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
 
         if (!response.ok) {
           throw new Error(
             response.status === 429
               ? "Too many requests. Please wait a moment before trying again."
-              : `Rooms could not be loaded (${response.status}). Please try again.`
+              : `Rooms could not be loaded (${response.status}). Please try again.`,
           );
         }
 
@@ -86,7 +87,7 @@ export default function RoomsPage() {
           setError(
             err instanceof TypeError
               ? "We couldn’t connect. Check your connection and try again."
-              : err.message
+              : err.message,
           );
         }
       } finally {
@@ -134,8 +135,8 @@ export default function RoomsPage() {
           </h1>
 
           <p className="mt-5 max-w-lg text-base leading-7 text-slate-300">
-            From a space of your own to a room you share. Explore your
-            options and find a stay that suits you.
+            From a space of your own to a room you share. Explore your options
+            and find a stay that suits you.
           </p>
         </div>
       </div>
@@ -335,6 +336,12 @@ export default function RoomsPage() {
                   <p className="mt-4 text-sm font-medium text-slate-600">
                     {room.available_spaces} of {room.capacity} spaces available
                   </p>
+                  <Link
+                    to={`/rooms/${room.id}`}
+                    className="mt-5 block rounded-xl bg-blue-700 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    View details
+                  </Link>
                 </div>
               </div>
             </article>
