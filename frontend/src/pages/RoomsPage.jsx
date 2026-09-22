@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { fetchWithTimeout } from "../services/fetchWithTimeout";
+import LoadingMessage from "../components/common/LoadingMessage";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -58,7 +60,7 @@ export default function RoomsPage() {
       if (capacity) params.set("capacity", capacity);
 
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${API_BASE_URL}/rooms/?${params.toString()}`,
           { signal: controller.signal },
         );
@@ -245,7 +247,9 @@ export default function RoomsPage() {
 
       {loading ? (
         <div role="status">
-          <p className="sr-only">Loading rooms</p>
+          <div className="mb-5">
+            <LoadingMessage label="Loading rooms…" />
+          </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((item) => (
