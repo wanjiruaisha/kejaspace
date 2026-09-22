@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetchWithTimeout"; 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 let refreshPromise = null;
@@ -59,7 +60,7 @@ async function refreshAccessToken() {
   }
 
   const task = (async () => {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/auth/refresh/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -128,7 +129,7 @@ export async function apiRequest(
       headers["Content-Type"] = "application/json";
     }
 
-    return fetch(`${API_BASE_URL}${path}`, {
+    return fetchWithTimeout(`${API_BASE_URL}${path}`, {
       method,
       headers,
       body: payload === undefined ? undefined : JSON.stringify(payload),
