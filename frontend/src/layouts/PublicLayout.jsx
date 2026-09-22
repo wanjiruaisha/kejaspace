@@ -1,77 +1,21 @@
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, Outlet } from "react-router";
 import useAuth from "../hooks/useAuth";
-import LogoutButton from "../components/auth/LogoutButton";
+
+import Navbar from "../components/navigation/Navbar";
+
 
 export default function PublicLayout() {
-  const { user, authLoading, authError } = useAuth();
-  const linkStyle = ({ isActive }) =>
-    `rounded-full px-4 py-2 text-sm font-semibold transition ${
-      isActive
-        ? "bg-blue-50 text-blue-700"
-        : "text-slate-600 hover:bg-slate-100"
-    }`;
-
-  return (
+  const {  authError } = useAuth();
+  
+return (
     <div className="flex min-h-screen flex-col bg-[#f5f7fb]">
-      <header className="border-b border-slate-200 bg-white">
-        <nav
-          aria-label="Main navigation"
-          className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8"
-        >
-          <Link to="/" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-blue-700 text-lg font-bold text-white">
-              K
-            </span>
+      <Navbar />
 
-            <span className="text-xl font-bold tracking-tight text-slate-900">
-              Keja<span className="text-blue-700">Space</span>
-            </span>
-          </Link>
-
-          <div className="flex flex-wrap items-center justify-end gap-1">
-            <NavLink to="/" end className={linkStyle}>
-              Home
-            </NavLink>
-
-            <NavLink to="/rooms" className={linkStyle}>
-              Rooms
-            </NavLink>
-            {user && !user.is_staff && !user.is_superuser && (
-              <NavLink to="/my-applications" className={linkStyle}>
-                My applications
-              </NavLink>
-            )}
-            {authLoading ? (
-              <span className="px-3 text-sm text-slate-500">
-                Checking session…
-              </span>
-            ) : user ? (
-              <>
-                <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                  Hi, {user.username}
-                </span>
-
-                <LogoutButton />
-              </>
-            ) : (
-              <>
-                <NavLink to="/login" className={linkStyle}>
-                  Log in
-                </NavLink>
-
-                <Link
-                  to="/register"
-                  className="rounded-full bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-                >
-                  Sign up
-                </Link>
-              </>
-            )}
-          </div>
-        </nav>
-      </header>
-
-      <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-8 sm:px-8 sm:py-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-7xl flex-1 px-5 py-8 sm:px-8 sm:py-12"
+      >
         {authError && (
           <p
             role="alert"
@@ -80,8 +24,10 @@ export default function PublicLayout() {
             {authError}
           </p>
         )}
+
         <Outlet />
       </main>
+ 
 
       <footer className="mt-16 border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8">
