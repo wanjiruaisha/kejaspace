@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
+import { fetchWithTimeout } from "../services/fetchWithTimeout";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -20,7 +21,7 @@ export default function RoomDetailsPage() {
       setRoom(null);
 
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${API_BASE_URL}/rooms/${id}/`,
           { signal: controller.signal }
         );
