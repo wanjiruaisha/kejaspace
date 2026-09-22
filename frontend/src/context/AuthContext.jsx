@@ -1,9 +1,13 @@
 import { createContext, useEffect, useState } from "react";
+
 import {
   getCurrentUser,
   loginRequest,
   logoutRequest,
 } from "../services/authService";
+
+import { clearSession, saveSession } from "../services/api";
+
 export const AuthContext = createContext(null);
 
 export default function AuthProvider({ children }) {
@@ -14,33 +18,38 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function restoreSession() {
-      const accessToken = sessionStorage.getItem("access_token");
+    function handleSessionExpired() {
+      setUser(null);
+      setAuthError("Your session has expired. Please log in again.");
+    }
 
-      if (!accessToken) {
+    window.addEventListener(
+      "kejaspace:session-expired",
+      handleSessionExpired
+    );
+
+    async function restoreSession() {
+      const access = sessionStorage.getItem("access_token");
+      const refresh = sessionStorage.getItem("refresh_token");
+
+      if (!access && !refresh) {
         setAuthLoading(false);
         return;
       }
 
       try {
-        const currentUser = await getCurrentUser(
-          accessToken,
-          controller.signal,
-        );
+        const currentUser = await getCurrentUser(controller.signal);
 
         if (!controller.signal.aborted) {
           setUser(currentUser);
+          setAuthError("");
         }
       } catch (error) {
-        if (controller.signal.aborted) return;
-
-        if (error.status === 401) {
-          sessionStorage.removeItem("access_token");
-          sessionStorage.removeItem("refresh_token");
-          setAuthError("Your session has expired. Please log in again.");
-        } else {
+        if (!controller.signal.aborted) {
           setAuthError(
-            "We couldn’t check your saved session. Please reload or log in again.",
+            error.status === 401
+              ? "Your session has expired. Please log in again."
+              : "We couldn’t check your session. Please reload or log in again."
           );
         }
       } finally {
@@ -52,46 +61,48 @@ export default function AuthProvider({ children }) {
 
     restoreSession();
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+
+      window.removeEventListener(
+        "kejaspace:session-expired",
+        handleSessionExpired
+      );
+    };
   }, []);
 
   async function login(username, password) {
     const tokens = await loginRequest(username, password);
 
-    const currentUser = await getCurrentUser(tokens.access);
+    saveSession(tokens);
+    setUser(null);
 
-    sessionStorage.setItem("access_token", tokens.access);
-    sessionStorage.setItem("refresh_token", tokens.refresh);
+    try {
+      const currentUser = await getCurrentUser();
 
-    setUser(currentUser);
-    setAuthError("");
+      setUser(currentUser);
+      setAuthError("");
 
-    return currentUser;
-  }
-  async function logout() {
-    const accessToken = sessionStorage.getItem("access_token");
-    const refreshToken = sessionStorage.getItem("refresh_token");
-
-    if (!accessToken || !refreshToken) {
-      throw new Error(
-        "Your session is incomplete. Reload the page and log in again.",
-      );
+      return currentUser;
+    } catch (error) {
+      clearSession();
+      throw error;
     }
+  }
 
-    await logoutRequest(accessToken, refreshToken);
+  async function logout() {
+    await logoutRequest();
 
-    sessionStorage.removeItem("access_token");
-    sessionStorage.removeItem("refresh_token");
-
+    clearSession();
     setUser(null);
     setAuthError("");
   }
 
   return (
-  <AuthContext.Provider
-    value={{ user, login, logout, authLoading, authError }}
-  >
-    {children}
-  </AuthContext.Provider>
-);
+    <AuthContext.Provider
+      value={{ user, login, logout, authLoading, authError }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
