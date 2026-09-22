@@ -36,6 +36,11 @@ export default function PublicLayout() {
             <NavLink to="/rooms" className={linkStyle}>
               Rooms
             </NavLink>
+            {user && !user.is_staff && !user.is_superuser && (
+              <NavLink to="/my-applications" className={linkStyle}>
+                My applications
+              </NavLink>
+            )}
             {authLoading ? (
               <span className="px-3 text-sm text-slate-500">
                 Checking session…
