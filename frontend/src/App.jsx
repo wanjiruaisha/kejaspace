@@ -15,7 +15,7 @@ import MyApplicationsPage from "./pages/resident/MyApplicationsPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import ApplyPage from "./pages/resident/ApplyPage";
-
+import ApplicationsPage from "./pages/staff/ApplicationsPage";
 
 export default function App() {
   return (
@@ -31,11 +31,11 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<RoleRoute allowedRoles={["resident"]} />}>
-            <Route
-              path="my-applications"
-              element={<MyApplicationsPage />}
-            />
+            <Route path="my-applications" element={<MyApplicationsPage />} />
             <Route path="rooms/:id/apply" element={<ApplyPage />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
+            <Route path="staff/applications" element={<ApplicationsPage />} />
           </Route>
         </Route>
 
