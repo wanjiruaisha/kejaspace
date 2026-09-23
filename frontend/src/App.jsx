@@ -14,6 +14,8 @@ import MyApplicationsPage from "./pages/resident/MyApplicationsPage";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import ApplyPage from "./pages/resident/ApplyPage";
+
 
 export default function App() {
   return (
@@ -33,6 +35,7 @@ export default function App() {
               path="my-applications"
               element={<MyApplicationsPage />}
             />
+            <Route path="rooms/:id/apply" element={<ApplyPage />} />
           </Route>
         </Route>
 
