@@ -15,3 +15,30 @@ export function cancelApplication(applicationId) {
     method: "POST",
   });
 }
+
+export function listStaffApplications(page, status, signal) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "6",
+  });
+
+  if (status) {
+    params.set("status", status);
+  }
+
+  return apiRequest(`/staff/applications/?${params.toString()}`, {
+    signal,
+  });
+}
+
+export function approveApplication(applicationId) {
+  return apiRequest(`/staff/applications/${applicationId}/approve/`, {
+    method: "POST",
+  });
+}
+
+export function rejectApplication(applicationId) {
+  return apiRequest(`/staff/applications/${applicationId}/reject/`, {
+    method: "POST",
+  });
+}
