@@ -40,6 +40,11 @@ export default function Navbar() {
       to: "/staff/applications",
       roles: ["staff", "admin"],
     },
+    {
+     label: "My stay",
+     to: "/my-stay",
+     roles: ["resident"],
+},
   ];
 
   const visibleLinks = navigation.filter((item) => item.roles.includes(role));
