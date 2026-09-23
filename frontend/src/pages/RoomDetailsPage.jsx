@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { fetchWithTimeout } from "../services/fetchWithTimeout";
+import useAuth from "../hooks/useAuth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function RoomDetailsPage() {
   const { id } = useParams();
+  const { user, authLoading } = useAuth();
+  const isResident = Boolean(user) && !user.is_staff && !user.is_superuser;
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,14 +26,14 @@ export default function RoomDetailsPage() {
       try {
         const response = await fetchWithTimeout(
           `${API_BASE_URL}/rooms/${id}/`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
 
         if (!response.ok) {
           throw new Error(
             response.status === 404
               ? "This room could not be found or is no longer listed."
-              : "Could not load this room. Please try again."
+              : "Could not load this room. Please try again.",
           );
         }
 
@@ -44,7 +47,7 @@ export default function RoomDetailsPage() {
           setError(
             err instanceof TypeError
               ? "Could not connect to the server. Please try again."
-              : err.message
+              : err.message,
           );
         }
       } finally {
@@ -127,9 +130,7 @@ export default function RoomDetailsPage() {
               </div>
 
               <div className="rounded-2xl bg-slate-50 p-5">
-                <dt className="text-sm text-slate-500">
-                  Available spaces
-                </dt>
+                <dt className="text-sm text-slate-500">Available spaces</dt>
                 <dd className="mt-2 text-2xl font-bold text-slate-900">
                   {room.available_spaces}
                 </dd>
@@ -158,9 +159,35 @@ export default function RoomDetailsPage() {
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Submit an accommodation application for staff review.
-                After approval, pay the first month’s full rent before
-                your payment deadline to confirm your reservation.
+                Submit an accommodation application for staff review. After
+                approval, pay the first month’s full rent before your payment
+                deadline to confirm your reservation.
+                {!authLoading && (
+                  <div className="mt-6">
+                    {isResident ? (
+                      <Link
+                        to={`/rooms/${room.id}/apply`}
+                        className="block rounded-xl bg-blue-700 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800"
+                      >
+                        Apply for this room
+                      </Link>
+                    ) : !user ? (
+                      <>
+                        <Link
+                          to="/login"
+                          className="block rounded-xl bg-blue-700 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800"
+                        >
+                          Log in to apply
+                        </Link>
+
+                        <p className="mt-3 text-xs leading-5 text-slate-500">
+                          After logging in, return to this room to submit your
+                          application.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                )}
               </p>
             </div>
           </aside>
