@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+
 import { apiRequest } from "../../services/api";
+import { cancelApplication } from "../../services/accommodationService";
 
 const statusStyles = {
   pending: "bg-amber-50 text-amber-800",
@@ -17,6 +19,13 @@ export default function MyApplicationsPage() {
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
 
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+
+  // Load the signed-in resident's applications.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -31,12 +40,15 @@ export default function MyApplicationsPage() {
         );
 
         if (!Array.isArray(data?.results)) {
-          throw new Error("The server returned an unexpected application list.");
+          throw new Error(
+            "The server returned an unexpected application list."
+          );
         }
 
         if (!controller.signal.aborted) {
           setApplications(data.results);
           setHasNext(Boolean(data.next));
+          setNeedsRefresh(false);
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -57,6 +69,73 @@ export default function MyApplicationsPage() {
 
     return () => controller.abort();
   }, [page, retry]);
+
+  // Cancel only after the resident confirms.
+  async function handleCancel(applicationId) {
+    if (cancellingId !== null || needsRefresh || loading) return;
+
+    setActionError("");
+    setActionMessage("");
+    setCancellingId(applicationId);
+
+    try {
+      const updatedApplication = await cancelApplication(applicationId);
+
+      if (
+        updatedApplication?.id !== applicationId ||
+        updatedApplication.status !== "cancelled"
+      ) {
+        throw new Error("Unexpected cancellation response.");
+      }
+
+      setApplications((previous) =>
+        previous.map((application) =>
+          application.id === applicationId
+            ? updatedApplication
+            : application
+        )
+      );
+
+      setConfirmingId(null);
+      setActionMessage("Your application has been cancelled.");
+    } catch (err) {
+      setConfirmingId(null);
+
+      if (err.status === 400 || err.status === 404) {
+        setActionError(err.message);
+        setNeedsRefresh(true);
+      } else if (err.status === 401 || err.status === 403) {
+        setActionError(err.message);
+      } else if (err.status === 429) {
+        setActionError(
+          "Too many requests. Please wait before trying again."
+        );
+      } else {
+        setActionError(
+          "We couldn’t confirm the cancellation. Refresh the list to check its current status before trying again."
+        );
+        setNeedsRefresh(true);
+      }
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  function refreshApplications() {
+    setConfirmingId(null);
+    setActionError("");
+    setActionMessage("");
+    setLoading(true);
+    setRetry((value) => value + 1);
+  }
+
+  function changePage(nextPage) {
+    setConfirmingId(null);
+    setActionError("");
+    setActionMessage("");
+    setLoading(true);
+    setPage(nextPage);
+  }
 
   return (
     <section>
@@ -83,6 +162,35 @@ export default function MyApplicationsPage() {
         </Link>
       </div>
 
+      {actionMessage && (
+        <p
+          role="status"
+          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+        >
+          {actionMessage}
+        </p>
+      )}
+
+      {actionError && (
+        <div
+          role="alert"
+          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <p>{actionError}</p>
+
+          {needsRefresh && (
+            <button
+              type="button"
+              onClick={refreshApplications}
+              disabled={loading || cancellingId !== null}
+              className="mt-3 font-semibold underline disabled:opacity-50"
+            >
+              Refresh applications
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <p role="status" className="mt-8 text-slate-600">
           Loading your applications…
@@ -96,7 +204,7 @@ export default function MyApplicationsPage() {
 
           <button
             type="button"
-            onClick={() => setRetry((value) => value + 1)}
+            onClick={refreshApplications}
             className="mt-4 font-semibold underline"
           >
             Try again
@@ -135,13 +243,15 @@ export default function MyApplicationsPage() {
               </div>
 
               <dl className="mt-5 space-y-3 text-sm">
-                <div className="flex justify-between gap-3">
+                <div className="flex flex-wrap justify-between gap-3">
                   <dt className="text-slate-500">Application number</dt>
                   <dd className="font-medium">#{application.id}</dd>
                 </div>
 
-                <div className="flex justify-between gap-3">
-                  <dt className="text-slate-500">Requested move-in date</dt>
+                <div className="flex flex-wrap justify-between gap-3">
+                  <dt className="text-slate-500">
+                    Requested move-in date
+                  </dt>
                   <dd className="font-medium">
                     {application.move_in_date}
                   </dd>
@@ -155,6 +265,65 @@ export default function MyApplicationsPage() {
                   for the current payment and reservation status.
                 </p>
               )}
+
+              {application.status === "pending" && (
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  {confirmingId === application.id ? (
+                    <div className="rounded-xl bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Cancel this application?
+                      </p>
+
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        It will no longer be available for staff approval.
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingId(null)}
+                          disabled={cancellingId !== null}
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                        >
+                          Keep application
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(application.id)}
+                          disabled={
+                            loading ||
+                            cancellingId !== null ||
+                            needsRefresh
+                          }
+                          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                        >
+                          {cancellingId === application.id
+                            ? "Cancelling…"
+                            : "Yes, cancel"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionError("");
+                        setActionMessage("");
+                        setConfirmingId(application.id);
+                      }}
+                      disabled={
+                        loading ||
+                        cancellingId !== null ||
+                        needsRefresh
+                      }
+                      className="text-sm font-semibold text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancel application
+                    </button>
+                  )}
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -166,9 +335,9 @@ export default function MyApplicationsPage() {
       >
         <button
           type="button"
-          disabled={loading || page === 1}
-          onClick={() => setPage((value) => value - 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:opacity-40"
+          disabled={loading || cancellingId !== null || page === 1}
+          onClick={() => changePage(page - 1)}
+          className="rounded-xl border border-slate-300 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Previous
         </button>
@@ -177,9 +346,14 @@ export default function MyApplicationsPage() {
 
         <button
           type="button"
-          disabled={loading || Boolean(error) || !hasNext}
-          onClick={() => setPage((value) => value + 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:opacity-40"
+          disabled={
+            loading ||
+            cancellingId !== null ||
+            Boolean(error) ||
+            !hasNext
+          }
+          onClick={() => changePage(page + 1)}
+          className="rounded-xl border border-slate-300 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next
         </button>
