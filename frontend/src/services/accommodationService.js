@@ -9,3 +9,9 @@ export function createApplication(roomId, moveInDate) {
     },
   });
 }
+
+export function cancelApplication(applicationId) {
+  return apiRequest(`/applications/${applicationId}/cancel/`, {
+    method: "POST",
+  });
+}
