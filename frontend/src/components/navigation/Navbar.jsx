@@ -60,6 +60,11 @@ export default function Navbar() {
       to: "/staff/maintenance",
       roles: ["staff", "admin"],
     },
+    {
+      label: "Announcements",
+      to: "/announcements",
+      roles: ["resident", "staff", "admin"],
+    },
   ];
 
   const visibleLinks = navigation.filter((item) => item.roles.includes(role));
