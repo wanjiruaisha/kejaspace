@@ -23,6 +23,7 @@ import MaintenancePage from "./pages/staff/MaintenancePage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import ManageAnnouncementsPage from "./pages/admin/ManageAnnouncementsPage";
 import MyVisitorsPage from "./pages/resident/MyVisitorsPage";
+import VisitorsPage from "./pages/staff/VisitorsPage";
 
 export default function App() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
           <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
             <Route path="staff/applications" element={<ApplicationsPage />} />
             <Route path="staff/maintenance" element={<MaintenancePage />} />
+            <Route path="staff/visitors" element={<VisitorsPage />} />
           </Route>
         </Route>
 
