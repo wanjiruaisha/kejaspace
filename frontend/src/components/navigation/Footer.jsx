@@ -26,9 +26,7 @@ const linkClass =
 export default function Footer() {
   const { user, authLoading } = useAuth();
 
-  const isManagement = Boolean(
-    user && (user.is_staff || user.is_superuser),
-  );
+  const isManagement = Boolean(user && (user.is_staff || user.is_superuser));
 
   const accountLinks = !user
     ? guestLinks
@@ -66,8 +64,8 @@ export default function Footer() {
             </Link>
 
             <p className="mt-5 max-w-xs text-sm leading-7 text-slate-400">
-              Find your room, follow your application and manage
-              everyday hostel life in one place.
+              Find your room, follow your application and manage everyday hostel
+              life in one place.
             </p>
 
             <p className="mt-5 text-sm font-medium text-blue-300">
@@ -77,15 +75,19 @@ export default function Footer() {
 
           {/* General navigation */}
           <div>
-            <h2 className="text-sm font-semibold text-white">
-              Explore
-            </h2>
+            <h2 className="text-sm font-semibold text-white">Explore</h2>
 
             <nav aria-label="Footer explore" className="mt-5">
               <ul className="space-y-3">
                 <li>
                   <Link to="/" className={linkClass}>
                     Home
+                  </Link>
+                </li>
+
+                <li>
+                  <Link to="/about" className={linkClass}>
+                    About KejaSpace
                   </Link>
                 </li>
 
@@ -129,10 +131,7 @@ export default function Footer() {
 
                   {user?.is_superuser && (
                     <li>
-                      <Link
-                        to="/admin/announcements"
-                        className={linkClass}
-                      >
+                      <Link to="/admin/announcements" className={linkClass}>
                         Manage announcements
                       </Link>
                     </li>
@@ -149,9 +148,8 @@ export default function Footer() {
             </h2>
 
             <p className="mt-3 text-sm leading-7 text-slate-400">
-              After application approval, pay the first month’s full
-              rent before your payment deadline to confirm your
-              reservation.
+              After application approval, pay the first month’s full rent before
+              your payment deadline to confirm your reservation.
             </p>
 
             <Link
@@ -166,9 +164,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs leading-6 text-slate-400 sm:mt-12 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            © {new Date().getFullYear()} KejaSpace. All rights reserved.
-          </p>
+          <p>© {new Date().getFullYear()} KejaSpace. All rights reserved.</p>
 
           <p>Room applications · Resident services · Hostel management</p>
         </div>
