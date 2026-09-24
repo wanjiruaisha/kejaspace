@@ -173,6 +173,7 @@ class StaffMpesaAttemptSerializer(serializers.ModelSerializer):
         model = MpesaPaymentAttempt
         fields = [
             "id",
+            "checkout_request_id",
             "charge",
             "resident_name",
             "room_number",
@@ -184,7 +185,6 @@ class StaffMpesaAttemptSerializer(serializers.ModelSerializer):
             "payment",
             "created_at",
             "verified_at",
-            "checkout_request_id",
         ]
         read_only_fields = fields
 
