@@ -3,6 +3,8 @@ import { Link } from "react-router";
 
 import { apiRequest } from "../../services/api";
 import LoadingMessage from "../../components/common/LoadingMessage";
+import useAuth from "../../hooks/useAuth";
+import MpesaPaymentForm from "../../components/payments/MpesaPaymentForm";
 
 const paymentStyles = {
   unpaid: {
@@ -51,6 +53,7 @@ function formatDate(value, monthOnly = false) {
 }
 
 export default function MyChargesPage() {
+  const { user } = useAuth();
   const [charges, setCharges] = useState([]);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
@@ -67,10 +70,9 @@ export default function MyChargesPage() {
       setError("");
 
       try {
-        const data = await apiRequest(
-          `/charges/?page=${page}&page_size=6`,
-          { signal: controller.signal },
-        );
+        const data = await apiRequest(`/charges/?page=${page}&page_size=6`, {
+          signal: controller.signal,
+        });
 
         if (!Array.isArray(data?.results)) {
           throw new Error("The server returned an unexpected charge list.");
@@ -118,9 +120,7 @@ export default function MyChargesPage() {
             Your accommodation
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            My charges
-          </h1>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">My charges</h1>
 
           <p className="mt-3 max-w-xl leading-7 text-slate-500">
             View your monthly rent bills, recorded payments and remaining
@@ -231,9 +231,7 @@ export default function MyChargesPage() {
                 </div>
 
                 <div className="p-6">
-                  <p className="text-sm text-slate-500">
-                    Rent amount
-                  </p>
+                  <p className="text-sm text-slate-500">Rent amount</p>
 
                   <p className="mt-2 break-words text-3xl font-bold text-slate-900">
                     {formatMoney(charge.amount)}
@@ -263,32 +261,34 @@ export default function MyChargesPage() {
 
                   <dl className="mt-6 space-y-4 text-sm">
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">
-                        Charge number
-                      </dt>
+                      <dt className="text-slate-500">Charge number</dt>
                       <dd className="font-semibold text-slate-900">
                         #{charge.id}
                       </dd>
                     </div>
 
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">
-                        Stay number
-                      </dt>
+                      <dt className="text-slate-500">Stay number</dt>
                       <dd className="font-semibold text-slate-900">
                         #{charge.stay}
                       </dd>
                     </div>
 
                     <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">
-                        Rent due date
-                      </dt>
+                      <dt className="text-slate-500">Rent due date</dt>
                       <dd className="text-right font-medium text-slate-900">
                         {formatDate(charge.due_date)}
                       </dd>
                     </div>
                   </dl>
+
+                  {user?.id && Number(charge.payment_summary?.balance) > 0 && (
+                    <MpesaPaymentForm
+                      key={`${user.id}-${charge.id}`}
+                      chargeId={charge.id}
+                      userId={user.id}
+                    />
+                  )}
                 </div>
               </article>
             );
@@ -309,9 +309,7 @@ export default function MyChargesPage() {
           Previous
         </button>
 
-        <span className="text-sm text-slate-600">
-          Page {page}
-        </span>
+        <span className="text-sm text-slate-600">Page {page}</span>
 
         <button
           type="button"
