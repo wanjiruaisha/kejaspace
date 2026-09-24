@@ -17,6 +17,9 @@ import RoleRoute from "./routes/RoleRoute";
 import ApplyPage from "./pages/resident/ApplyPage";
 import ApplicationsPage from "./pages/staff/ApplicationsPage";
 import MyStayPage from "./pages/resident/MyStayPage";
+import MyChargesPage from "./pages/resident/MyChargesPage";
+
+
 
 export default function App() {
   return (
@@ -35,6 +38,7 @@ export default function App() {
             <Route path="my-applications" element={<MyApplicationsPage />} />
             <Route path="rooms/:id/apply" element={<ApplyPage />} />
             <Route path="my-stay" element={<MyStayPage />} />
+            <Route path="my-charges" element={<MyChargesPage />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
             <Route path="staff/applications" element={<ApplicationsPage />} />
