@@ -368,7 +368,7 @@ export default function StaysPage() {
 
                 <dl className="mt-5 space-y-3 text-sm">
                   {[
-                    ["Resident ID", `#${stay.resident}`],
+                    ["Resident", stay.resident_username || `Resident #${stay.resident}`],
                     ["Application number", `#${stay.application}`],
                     ["Checked in", formatTimestamp(stay.check_in_at)],
                     ["Checked out", formatTimestamp(stay.check_out_at)],
