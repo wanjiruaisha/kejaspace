@@ -46,6 +46,10 @@ class StaySerializer(serializers.ModelSerializer):
         source="room.room_number",
         read_only=True,
     )
+    resident_username = serializers.CharField(
+    source="resident.username",
+    read_only=True,
+    )
 
     class Meta:
         model = Stay
@@ -53,6 +57,7 @@ class StaySerializer(serializers.ModelSerializer):
             "id",
             "application",
             "resident",
+            "resident_username",
             "room",
             "room_number",
             "status",
