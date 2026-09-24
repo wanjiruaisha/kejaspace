@@ -12,6 +12,7 @@ import RoomDetailsPage from "./pages/RoomDetailsPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
+import AboutPage from "./pages/AboutPage";
 
 // Authentication
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -40,6 +41,8 @@ export default function App() {
       <Route element={<PublicLayout />}>
         {/* Public pages */}
         <Route index element={<HomePage />} />
+        <Route path="about" element={<AboutPage />} />
+
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="rooms/:id" element={<RoomDetailsPage />} />
 
