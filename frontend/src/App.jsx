@@ -19,6 +19,7 @@ import ApplicationsPage from "./pages/staff/ApplicationsPage";
 import MyStayPage from "./pages/resident/MyStayPage";
 import MyChargesPage from "./pages/resident/MyChargesPage";
 import MyMaintenancePage from "./pages/resident/MyMaintenancePage";
+import MaintenancePage from "./pages/staff/MaintenancePage";
 
 export default function App() {
   return (
@@ -38,10 +39,11 @@ export default function App() {
             <Route path="rooms/:id/apply" element={<ApplyPage />} />
             <Route path="my-stay" element={<MyStayPage />} />
             <Route path="my-charges" element={<MyChargesPage />} />
+            <Route path="my-maintenance" element={<MyMaintenancePage />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
             <Route path="staff/applications" element={<ApplicationsPage />} />
-            <Route path="my-maintenance" element={<MyMaintenancePage />} />
+            <Route path="staff/maintenance" element={<MaintenancePage />} />
           </Route>
         </Route>
 
