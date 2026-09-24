@@ -41,14 +41,24 @@ export default function Navbar() {
       roles: ["staff", "admin"],
     },
     {
-     label: "My stay",
-     to: "/my-stay",
-     roles: ["resident"],
+      label: "My stay",
+      to: "/my-stay",
+      roles: ["resident"],
     },
     {
-     label: "My charges",
-     to: "/my-charges",
-     roles: ["resident"],
+      label: "My charges",
+      to: "/my-charges",
+      roles: ["resident"],
+    },
+    {
+      label: "Maintenance",
+      to: "/my-maintenance",
+      roles: ["resident"],
+    },
+    {
+      label: "Maintenance",
+      to: "/staff/maintenance",
+      roles: ["staff", "admin"],
     },
   ];
 
