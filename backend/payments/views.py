@@ -90,7 +90,7 @@ class StaffChargeListCreateView(generics.ListCreateAPIView):
             serializer.save(
                 stay=stay,
                 created_by=self.request.user,
-                is_initial_charge=False,
+                is_initial_rent=False,
             )
 
 
