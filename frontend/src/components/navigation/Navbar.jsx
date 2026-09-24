@@ -44,7 +44,12 @@ export default function Navbar() {
      label: "My stay",
      to: "/my-stay",
      roles: ["resident"],
-},
+    },
+    {
+     label: "My charges",
+     to: "/my-charges",
+     roles: ["resident"],
+    },
   ];
 
   const visibleLinks = navigation.filter((item) => item.roles.includes(role));
