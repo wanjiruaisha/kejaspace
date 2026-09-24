@@ -24,6 +24,8 @@ import AnnouncementsPage from "./pages/AnnouncementsPage";
 import ManageAnnouncementsPage from "./pages/admin/ManageAnnouncementsPage";
 import MyVisitorsPage from "./pages/resident/MyVisitorsPage";
 import VisitorsPage from "./pages/staff/VisitorsPage";
+import StaysPage from "./pages/staff/StaysPage";
+
 
 export default function App() {
   return (
@@ -59,6 +61,7 @@ export default function App() {
             <Route path="staff/applications" element={<ApplicationsPage />} />
             <Route path="staff/maintenance" element={<MaintenancePage />} />
             <Route path="staff/visitors" element={<VisitorsPage />} />
+            <Route path="staff/stays" element={<StaysPage />} />
           </Route>
         </Route>
 
