@@ -70,6 +70,11 @@ export default function Navbar() {
       to: "/admin/announcements",
       roles: ["admin"],
     },
+    {
+      label: "My visitors",
+      to: "/my-visitors",
+      roles: ["resident"],
+    },
   ];
 
   const visibleLinks = navigation.filter((item) => item.roles.includes(role));
