@@ -77,3 +77,30 @@ export function deleteAnnouncement(id) {
     method: "DELETE",
   });
 }
+
+export function listStaffStays({ page, status, signal }) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "6",
+  });
+
+  if (status) {
+    params.set("status", status);
+  }
+
+  return apiRequest(`/staff/stays/?${params.toString()}`, {
+    signal,
+  });
+}
+
+export function performStayAction(stayId, action) {
+  const allowedActions = ["check-in", "check-out", "cancel"];
+
+  if (!allowedActions.includes(action)) {
+    throw new Error("Unsupported stay action.");
+  }
+
+  return apiRequest(`/staff/stays/${stayId}/${action}/`, {
+    method: "POST",
+  });
+}
