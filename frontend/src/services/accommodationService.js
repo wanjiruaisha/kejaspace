@@ -42,3 +42,38 @@ export function rejectApplication(applicationId) {
     method: "POST",
   });
 }
+
+export function listAdminAnnouncements({ page, published, signal }) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "6",
+  });
+
+  if (published !== "") {
+    params.set("is_published", published);
+  }
+
+  return apiRequest(`/admin/announcements/?${params.toString()}`, {
+    signal,
+  });
+}
+
+export function createAnnouncement(data) {
+  return apiRequest("/admin/announcements/", {
+    method: "POST",
+    body: data,
+  });
+}
+
+export function updateAnnouncement(id, data) {
+  return apiRequest(`/admin/announcements/${id}/`, {
+    method: "PATCH",
+    body: data,
+  });
+}
+
+export function deleteAnnouncement(id) {
+  return apiRequest(`/admin/announcements/${id}/`, {
+    method: "DELETE",
+  });
+}
