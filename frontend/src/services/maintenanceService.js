@@ -24,3 +24,25 @@ export function createMaintenanceRequest(title, description) {
     },
   });
 }
+
+export function listStaffMaintenance({ page, status, signal }) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "6",
+  });
+
+  if (status) {
+    params.set("status", status);
+  }
+
+  return apiRequest(`/staff/maintenance/?${params.toString()}`, {
+    signal,
+  });
+}
+
+export function updateMaintenanceRequest(requestId, updates) {
+  return apiRequest(`/staff/maintenance/${requestId}/`, {
+    method: "PATCH",
+    body: updates,
+  });
+}
