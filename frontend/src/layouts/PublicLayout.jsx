@@ -8,13 +8,13 @@ export default function PublicLayout() {
   const { authError } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f7fb]">
+    <div className="flex min-h-dvh min-w-0 flex-col bg-[#f5f7fb]">
       <Navbar />
 
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-7xl flex-1 px-5 py-8 sm:px-8 sm:py-12"
+        className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-8 sm:py-8"
       >
         {authError && (
           <p
