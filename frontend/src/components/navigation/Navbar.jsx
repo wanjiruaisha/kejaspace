@@ -85,6 +85,16 @@ export default function Navbar() {
       to: "/staff/stays",
       roles: ["staff", "admin"],
     },
+    {
+      label: "Manage rooms",
+      to: "/admin/rooms",
+      roles: ["admin"],
+    },
+    {
+      label: "Manage users",
+      to: "/admin/users",
+      roles: ["admin"],
+    },
   ];
 
   const visibleLinks = navigation.filter((item) => item.roles.includes(role));
