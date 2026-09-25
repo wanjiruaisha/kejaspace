@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { fetchWithTimeout } from "../services/fetchWithTimeout";
 import LoadingMessage from "../components/common/LoadingMessage";
+import { getRoomImage } from "../utils/roomImages";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -293,10 +294,11 @@ export default function RoomsPage() {
               className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg"
             >
               <div
-                className={`relative flex h-40 items-center justify-center bg-linear-to-br ${
+                className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-linear-to-br ${
                   cardColors[room.capacity] || "from-slate-100 to-blue-50"
                 }`}
               >
+                {/* Fallback label if the photo is missing or fails to load */}
                 <span
                   aria-hidden="true"
                   className="text-6xl font-black tracking-tight text-slate-900/15"
@@ -304,15 +306,36 @@ export default function RoomsPage() {
                   {room.room_number}
                 </span>
 
+                {getRoomImage(room.capacity) && (
+                  <img
+                    src={getRoomImage(room.capacity)}
+                    alt={`Illustrative photo of a ${
+                      roomTypes[room.capacity] || `${room.capacity}-person room`
+                    }`}
+                    loading="lazy"
+                    decoding="async"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+
                 <span
-                  className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-semibold ${
+                  className={`absolute right-4 top-4 rounded-full bg-white px-3 py-1 text-xs font-semibold shadow-sm ${
                     room.available_spaces > 0
-                      ? "bg-white text-emerald-800"
-                      : "bg-white text-slate-600"
+                      ? "text-emerald-800"
+                      : "text-slate-600"
                   }`}
                 >
                   {room.available_spaces > 0 ? "Available" : "Currently full"}
                 </span>
+
+                {getRoomImage(room.capacity) && (
+                  <span className="absolute bottom-3 left-3 rounded-lg bg-slate-950/75 px-2.5 py-1 text-xs text-white">
+                    Illustrative room photo
+                  </span>
+                )}
               </div>
 
               <div className="p-6">
