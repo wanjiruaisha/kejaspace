@@ -34,6 +34,8 @@ import StaysPage from "./pages/staff/StaysPage";
 
 // Admin pages
 import ManageAnnouncementsPage from "./pages/admin/ManageAnnouncementsPage";
+import ManageRoomsPage from "./pages/admin/ManageRoomsPage";
+import ManageUsersPage from "./pages/admin/ManageUsersPage";
 
 export default function App() {
   return (
@@ -53,59 +55,24 @@ export default function App() {
         {/* Login required */}
         <Route element={<ProtectedRoute />}>
           {/* Available to every logged-in role */}
-          <Route
-            path="announcements"
-            element={<AnnouncementsPage />}
-          />
+          <Route path="announcements" element={<AnnouncementsPage />} />
 
           {/* Residents only */}
           <Route element={<RoleRoute allowedRoles={["resident"]} />}>
-            <Route
-              path="rooms/:id/apply"
-              element={<ApplyPage />}
-            />
-            <Route
-              path="my-applications"
-              element={<MyApplicationsPage />}
-            />
-            <Route
-              path="my-stay"
-              element={<MyStayPage />}
-            />
-            <Route
-              path="my-charges"
-              element={<MyChargesPage />}
-            />
-            <Route
-              path="my-maintenance"
-              element={<MyMaintenancePage />}
-            />
-            <Route
-              path="my-visitors"
-              element={<MyVisitorsPage />}
-            />
+            <Route path="rooms/:id/apply" element={<ApplyPage />} />
+            <Route path="my-applications" element={<MyApplicationsPage />} />
+            <Route path="my-stay" element={<MyStayPage />} />
+            <Route path="my-charges" element={<MyChargesPage />} />
+            <Route path="my-maintenance" element={<MyMaintenancePage />} />
+            <Route path="my-visitors" element={<MyVisitorsPage />} />
           </Route>
 
           {/* Staff and admins */}
-          <Route
-            element={<RoleRoute allowedRoles={["staff", "admin"]} />}
-          >
-            <Route
-              path="staff/applications"
-              element={<ApplicationsPage />}
-            />
-            <Route
-              path="staff/stays"
-              element={<StaysPage />}
-            />
-            <Route
-              path="staff/maintenance"
-              element={<MaintenancePage />}
-            />
-            <Route
-              path="staff/visitors"
-              element={<VisitorsPage />}
-            />
+          <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
+            <Route path="staff/applications" element={<ApplicationsPage />} />
+            <Route path="staff/stays" element={<StaysPage />} />
+            <Route path="staff/maintenance" element={<MaintenancePage />} />
+            <Route path="staff/visitors" element={<VisitorsPage />} />
           </Route>
 
           {/* Admins only */}
@@ -114,6 +81,8 @@ export default function App() {
               path="admin/announcements"
               element={<ManageAnnouncementsPage />}
             />
+            <Route path="admin/rooms" element={<ManageRoomsPage />} />
+            <Route path="admin/users" element={<ManageUsersPage />} />
           </Route>
         </Route>
 
