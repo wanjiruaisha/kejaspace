@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router";
 
 import PublicLayout from "./layouts/PublicLayout";
+import ManagementLayout from "./layouts/ManagementLayout";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -41,11 +42,10 @@ import ManageUsersPage from "./pages/admin/ManageUsersPage";
 export default function App() {
   return (
     <Routes>
+      {/* Public website and resident area */}
       <Route element={<PublicLayout />}>
-        {/* Public pages */}
         <Route index element={<HomePage />} />
         <Route path="about" element={<AboutPage />} />
-
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="rooms/:id" element={<RoomDetailsPage />} />
 
@@ -53,43 +53,81 @@ export default function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="unauthorized" element={<UnauthorizedPage />} />
 
-        {/* Login required */}
         <Route element={<ProtectedRoute />}>
-          {/* Available to every logged-in role */}
-          <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route
+            path="announcements"
+            element={<AnnouncementsPage />}
+          />
 
-          {/* Residents only */}
           <Route element={<RoleRoute allowedRoles={["resident"]} />}>
-            <Route path="rooms/:id/apply" element={<ApplyPage />} />
-            <Route path="my-applications" element={<MyApplicationsPage />} />
+            <Route
+              path="rooms/:id/apply"
+              element={<ApplyPage />}
+            />
+            <Route
+              path="my-applications"
+              element={<MyApplicationsPage />}
+            />
             <Route path="my-stay" element={<MyStayPage />} />
             <Route path="my-charges" element={<MyChargesPage />} />
-            <Route path="my-maintenance" element={<MyMaintenancePage />} />
-            <Route path="my-visitors" element={<MyVisitorsPage />} />
-          </Route>
-
-          {/* Staff and admins */}
-          <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
-            <Route path="staff/applications" element={<ApplicationsPage />} />
-            <Route path="staff/stays" element={<StaysPage />} />
-            <Route path="staff/maintenance" element={<MaintenancePage />} />
-            <Route path="staff/visitors" element={<VisitorsPage />} />
-            <Route path="staff/rent-payments" element={<RentPaymentsPage />} />
-          </Route>
-
-          {/* Admins only */}
-          <Route element={<RoleRoute allowedRoles={["admin"]} />}>
             <Route
-              path="admin/announcements"
-              element={<ManageAnnouncementsPage />}
+              path="my-maintenance"
+              element={<MyMaintenancePage />}
             />
-            <Route path="admin/rooms" element={<ManageRoomsPage />} />
-            <Route path="admin/users" element={<ManageUsersPage />} />
+            <Route
+              path="my-visitors"
+              element={<MyVisitorsPage />}
+            />
           </Route>
         </Route>
 
-        {/* Unmatched addresses */}
         <Route path="*" element={<NotFoundPage />} />
+      </Route>
+
+      {/* Separate staff/admin area */}
+      <Route element={<ProtectedRoute />}>
+        <Route
+          element={<RoleRoute allowedRoles={["staff", "admin"]} />}
+        >
+          <Route element={<ManagementLayout />}>
+            <Route
+              path="staff/applications"
+              element={<ApplicationsPage />}
+            />
+            <Route path="staff/stays" element={<StaysPage />} />
+            <Route
+              path="staff/maintenance"
+              element={<MaintenancePage />}
+            />
+            <Route
+              path="staff/visitors"
+              element={<VisitorsPage />}
+            />
+            <Route
+              path="staff/rent-payments"
+              element={<RentPaymentsPage />}
+            />
+            <Route
+              path="staff/notices"
+              element={<AnnouncementsPage />}
+            />
+
+            <Route element={<RoleRoute allowedRoles={["admin"]} />}>
+              <Route
+                path="admin/announcements"
+                element={<ManageAnnouncementsPage />}
+              />
+              <Route
+                path="admin/rooms"
+                element={<ManageRoomsPage />}
+              />
+              <Route
+                path="admin/users"
+                element={<ManageUsersPage />}
+              />
+            </Route>
+          </Route>
+        </Route>
       </Route>
     </Routes>
   );
