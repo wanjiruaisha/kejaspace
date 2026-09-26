@@ -15,6 +15,11 @@ const staffLinks = [
     to: "/staff/reports/occupancy",
     icon: "rooms",
   },
+  {
+    label: "Payment report",
+    to: "/staff/reports/payments",
+    icon: "payments",
+  },
   { label: "Maintenance", to: "/staff/maintenance", icon: "maintenance" },
   { label: "Visitors", to: "/staff/visitors", icon: "visitors" },
   { label: "Hostel notices", to: "/staff/notices", icon: "notices" },
@@ -50,8 +55,6 @@ function SidebarLinks({ links, onNavigate }) {
           <ManagementIcon name={item.icon} className="size-4 shrink-0" />
           <span>{item.label}</span>
         </NavLink>
-        
-        
       ))}
     </div>
   );
@@ -126,7 +129,10 @@ export default function ManagementLayout() {
       {/* Mobile navigation */}
       <header className="border-b border-slate-200/70 bg-white lg:hidden">
         <div className="flex h-16 items-center justify-between px-4">
-          <Link to="/" className="font-heading text-base font-bold text-slate-900">
+          <Link
+            to="/"
+            className="font-heading text-base font-bold text-slate-900"
+          >
             Keja<span className="text-blue-600">Space</span>
           </Link>
 
