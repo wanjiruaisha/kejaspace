@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import useAuth from "../../hooks/useAuth";
 import LoadingMessage from "../../components/common/LoadingMessage";
+import ManagementIcon from "../../components/common/ManagementIcon";
 import { getStaffDashboard } from "../../services/dashboardService";
 
 const numberFormatter = new Intl.NumberFormat("en-KE");
@@ -39,27 +40,44 @@ function hasValidDashboard(data) {
   );
 }
 
-function SummaryCard({ label, value, description, symbol, tone }) {
-  return (
-    <article className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+const colourStyles = {
+  blue: {
+    text: "text-blue-600",
+    icon: "bg-blue-50 text-blue-600",
+  },
+  green: {
+    text: "text-emerald-600",
+    icon: "bg-emerald-50 text-emerald-600",
+  },
+  teal: {
+    text: "text-teal-600",
+    icon: "bg-teal-50 text-teal-600",
+  },
+  amber: {
+    text: "text-amber-600",
+    icon: "bg-amber-50 text-amber-600",
+  },
+};
 
-        <span
-          aria-hidden="true"
-          className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tone}`}
-        >
-          {symbol}
-        </span>
+function StatCard({ label, value, icon, colour }) {
+  const style = colourStyles[colour];
+
+  return (
+    <article className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-white px-4 py-4 shadow-sm">
+      <div className="min-w-0">
+        <h2 className="font-sans text-xs font-medium text-slate-500">
+          {label}
+        </h2>
+        <p className={`mt-1.5 text-2xl font-semibold tracking-tight ${style.text}`}>
+          {numberFormatter.format(value)}
+        </p>
       </div>
 
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
-        {numberFormatter.format(value)}
-      </p>
-
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        {description}
-      </p>
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${style.icon}`}
+      >
+        <ManagementIcon name={icon} className="size-5" />
+      </span>
     </article>
   );
 }
@@ -72,8 +90,6 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [loadedAt, setLoadedAt] = useState(null);
-
-  const isAdmin = Boolean(user?.is_superuser);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,24 +129,70 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [retry]);
 
+  const tasks = dashboard
+    ? [
+        {
+          label: "Accommodation applications",
+          description: "Waiting for staff review",
+          count: dashboard.applications.pending,
+          icon: "applications",
+          badge: "Pending",
+          to: "/staff/applications",
+          action: "Review",
+        },
+        {
+          label: "Maintenance requests",
+          description: "Pending or in progress",
+          count: dashboard.maintenance.unresolved,
+          icon: "maintenance",
+          badge: "Open",
+          to: "/staff/maintenance",
+          action: "View requests",
+        },
+        {
+          label: "Payment holds",
+          description: "Awaiting payment before the deadline",
+          count: dashboard.stays.unexpired_payment_holds,
+          icon: "clock",
+          badge: "Unexpired",
+          to: "/staff/stays",
+          action: "View stays",
+        },
+        {
+          label: "M-Pesa attempts",
+          description: "Payment outcome requires investigation",
+          count: dashboard.payments.mpesa_attempts_needing_review,
+          icon: "payments",
+          badge: "Review",
+          to: null,
+          action: null,
+        },
+      ]
+    : [];
+
   return (
     <section className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="page-title">Dashboard</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">
+            <span className="bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">
+              Hostel overview
+            </span>
+          </h1>
 
-          <p className="page-description">
-            Welcome, {user?.username}. Here is your hostel overview.
+          <p className="mt-1.5 text-sm text-slate-500">
+            Welcome back, {user?.username}. Here’s what needs your attention.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setRetry((value) => value + 1)}
           disabled={loading}
-          className="button-secondary"
+          onClick={() => setRetry((value) => value + 1)}
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-teal-500 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50"
         >
-          {loading ? "Refreshing…" : "Refresh overview"}
+          <ManagementIcon name="refresh" />
+          {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 
@@ -144,7 +206,6 @@ export default function DashboardPage() {
           className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800"
         >
           <p>{error}</p>
-
           <button
             type="button"
             onClick={() => setRetry((value) => value + 1)}
@@ -155,225 +216,152 @@ export default function DashboardPage() {
         </div>
       ) : dashboard ? (
         <>
-          <p className="mt-4 text-xs text-slate-500">
-            Last loaded{" "}
-            {loadedAt?.toLocaleTimeString("en-KE", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Africa/Nairobi",
-            })}{" "}
-            EAT. Refresh to see new activity.
-          </p>
-
-          {/* Main summary */}
-          <div className="mt-4 grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
               label="Active rooms"
               value={dashboard.rooms.active}
-              description={`${numberFormatter.format(
-                dashboard.rooms.total,
-              )} rooms in total`}
-              symbol="R"
-              tone="bg-blue-50 text-blue-700"
+              icon="rooms"
+              colour="blue"
             />
-
-            <SummaryCard
+            <StatCard
               label="Available spaces"
               value={dashboard.rooms.available_spaces}
-              description="In active rooms, after reservations and valid payment holds."
-              symbol="A"
-              tone="bg-emerald-50 text-emerald-700"
+              icon="check"
+              colour="green"
             />
-
-            <SummaryCard
+            <StatCard
               label="Checked-in residents"
               value={dashboard.stays.checked_in}
-              description="Residents with a checked-in stay."
-              symbol="C"
-              tone="bg-violet-50 text-violet-700"
+              icon="users"
+              colour="teal"
             />
-
-            <SummaryCard
+            <StatCard
               label="Pending applications"
               value={dashboard.applications.pending}
-              description="Applications waiting for staff review."
-              symbol="P"
-              tone="bg-amber-50 text-amber-700"
+              icon="applications"
+              colour="amber"
             />
           </div>
 
-          <div className="mt-6 grid items-start gap-6 xl:grid-cols-3">
-            {/* Work needing attention */}
-            <section className="min-w-0 rounded-2xl border border-slate-200 bg-white xl:col-span-2">
-              <div className="border-b border-slate-100 p-4 sm:p-5">
-                <h2 className="section-title">Needs attention</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Review requests and follow up on outstanding issues.
-                </p>
+          <div className="mt-6 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+            {/* Main list */}
+            <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-4">
+                <h2 className="font-heading text-base font-semibold text-slate-800">
+                  Needs attention
+                </h2>
+
+                <span className="text-xs text-slate-400">
+                  Current activity
+                </span>
               </div>
 
               <ul className="divide-y divide-slate-100">
-                <li className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Pending applications
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {numberFormatter.format(dashboard.applications.pending)}{" "}
-                      awaiting a decision
-                    </p>
-                  </div>
-
-                  <Link
-                    to="/staff/applications"
-                    className="button-secondary"
+                {tasks.map((task) => (
+                  <li
+                    key={task.label}
+                    className="flex flex-wrap items-center gap-3 px-4 py-4 transition hover:bg-slate-50/70"
                   >
-                    Review
-                  </Link>
-                </li>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-teal-500 text-white">
+                      <ManagementIcon name={task.icon} className="size-4" />
+                    </span>
 
-                <li className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Unresolved maintenance
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {numberFormatter.format(dashboard.maintenance.unresolved)}{" "}
-                      pending or in progress
-                    </p>
-                  </div>
-
-                  <Link
-                    to="/staff/maintenance"
-                    className="button-secondary"
-                  >
-                    View requests
-                  </Link>
-                </li>
-
-                <li className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Valid payment holds
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {numberFormatter.format(
-                        dashboard.stays.unexpired_payment_holds,
-                      )}{" "}
-                      stays awaiting payment before their deadline
-                    </p>
-                  </div>
-
-                  <Link to="/staff/stays" className="button-secondary">
-                    View stays
-                  </Link>
-                </li>
-
-                <li className="p-4 sm:px-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        M-Pesa attempts needing review
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        These attempts require investigation before their
-                        outcome can be treated as resolved.
+                    <div className="min-w-0 flex-1 basis-40">
+                      <h3 className="font-sans text-sm font-semibold text-slate-700">
+                        {task.label}
+                      </h3>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-400">
+                        {task.description}
                       </p>
                     </div>
 
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-800">
-                      {numberFormatter.format(
-                        dashboard.payments.mpesa_attempts_needing_review,
+                    <div className="ml-auto flex items-center gap-3">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
+                        {task.badge}
+                      </span>
+
+                      <span className="min-w-6 text-center text-sm font-semibold tabular-nums text-slate-800">
+                        {numberFormatter.format(task.count)}
+                      </span>
+
+                      {task.to ? (
+                        <Link
+                          to={task.to}
+                          aria-label={`${task.action}: ${task.label}`}
+                          className="flex size-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50"
+                        >
+                          <ManagementIcon name="arrow" />
+                        </Link>
+                      ) : (
+                        <span className="size-8" aria-hidden="true" />
                       )}
-                    </span>
-                  </div>
-                </li>
+                    </div>
+                  </li>
+                ))}
               </ul>
+
+              <div className="border-t border-slate-100 px-4 py-3">
+                <p className="text-xs text-slate-400">
+                  Loaded{" "}
+                  {loadedAt?.toLocaleTimeString("en-KE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "Africa/Nairobi",
+                  })}{" "}
+                  EAT · Refresh for the latest figures
+                </p>
+              </div>
             </section>
 
-            {/* Financial summary */}
-            <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="section-title">Recorded payments</h2>
+            {/* Small financial panel */}
+            <aside className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-heading text-sm font-semibold text-slate-700">
+                  Recorded payments
+                </h2>
+                <span className="rounded-lg bg-teal-50 p-2 text-teal-600">
+                  <ManagementIcon name="payments" />
+                </span>
+              </div>
 
-              <p className="mt-4 break-words text-2xl font-semibold tracking-tight text-blue-700">
+              <p className="mt-4 break-words text-xl font-semibold tracking-tight text-slate-900">
                 {moneyFormatter.format(
                   Number(dashboard.payments.recorded_total_all_time),
                 )}
               </p>
-
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                All-time total of payment records in the system. This is
-                not the outstanding rent balance.
+              <p className="mt-1 text-xs text-slate-400">
+                All time · Cash, bank and recorded M-Pesa payments
               </p>
 
               <Link
                 to="/staff/rent-payments"
-                className="button-secondary mt-5"
+                className="mt-5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
               >
-                Rent & payments
+                Open rent & payments
+                <ManagementIcon name="arrow" />
               </Link>
-            </section>
+            </aside>
           </div>
 
-          {/* Additional figures */}
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="section-title">Rooms and stays</h2>
-
-            <dl className="mt-4 grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ["Total rooms", dashboard.rooms.total],
-                ["Active-room capacity", dashboard.rooms.active_room_capacity],
-                ["Reserved stays", dashboard.stays.reserved],
-                ["Checked-in stays", dashboard.stays.checked_in],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-slate-500">{label}</dt>
-                  <dd className="mt-1 text-lg font-semibold text-slate-900">
-                    {numberFormatter.format(value)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <p className="mt-4 text-xs leading-5 text-slate-500">
-              Capacity and available spaces cover active rooms only.
-              Stay counts cover all rooms.
-            </p>
-          </section>
-
-          {/* Links to existing pages */}
-          <section className="mt-6">
-            <h2 className="section-title">Quick access</h2>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link to="/staff/stays" className="button-secondary">
-                Resident stays
-              </Link>
-              <Link to="/staff/visitors" className="button-secondary">
-                Visitors
-              </Link>
-              <Link to="/staff/notices" className="button-secondary">
-                Hostel notices
-              </Link>
-
-              {isAdmin && (
-                <>
-                  <Link to="/admin/rooms" className="button-secondary">
-                    Manage rooms
-                  </Link>
-                  <Link to="/admin/users" className="button-secondary">
-                    Manage users
-                  </Link>
-                  <Link
-                    to="/admin/announcements"
-                    className="button-secondary"
-                  >
-                    Manage announcements
-                  </Link>
-                </>
-              )}
+          <details className="mt-4 text-xs text-slate-500">
+            <summary className="w-fit cursor-pointer rounded py-1 font-medium">
+              About these figures
+            </summary>
+            <div className="mt-2 max-w-2xl space-y-2 leading-6">
+              <p>
+                Available spaces cover active rooms and exclude spaces used
+                by checked-in stays, reservations, and unexpired payment holds.
+              </p>
+              <p>
+                Checked-in residents are counted across all rooms. Recorded
+                payments are an all-time total, not outstanding rent.
+              </p>
+              <p>
+                M-Pesa attempts marked for review are not automatically
+                successful payments. Their review screen is not connected here yet.
+              </p>
             </div>
-          </section>
+          </details>
         </>
       ) : null}
     </section>
