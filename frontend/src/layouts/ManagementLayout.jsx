@@ -10,6 +10,11 @@ const staffLinks = [
   { label: "Applications", to: "/staff/applications", icon: "applications" },
   { label: "Resident stays", to: "/staff/stays", icon: "stays" },
   { label: "Rent & payments", to: "/staff/rent-payments", icon: "payments" },
+  {
+    label: "Occupancy report",
+    to: "/staff/reports/occupancy",
+    icon: "rooms",
+  },
   { label: "Maintenance", to: "/staff/maintenance", icon: "maintenance" },
   { label: "Visitors", to: "/staff/visitors", icon: "visitors" },
   { label: "Hostel notices", to: "/staff/notices", icon: "notices" },
@@ -45,6 +50,8 @@ function SidebarLinks({ links, onNavigate }) {
           <ManagementIcon name={item.icon} className="size-4 shrink-0" />
           <span>{item.label}</span>
         </NavLink>
+        
+        
       ))}
     </div>
   );
