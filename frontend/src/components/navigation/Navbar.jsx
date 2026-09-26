@@ -62,6 +62,11 @@ const accountLinks = [
     to: "/announcements",
     roles: ["resident", "staff", "admin"],
   },
+  {
+  label: "Rent & payments",
+  to: "/staff/rent-payments",
+  roles: ["staff", "admin"],
+  },
 ];
 
 const adminLinks = [
