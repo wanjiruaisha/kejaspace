@@ -188,7 +188,7 @@ export default function Navbar() {
               K
             </span>
 
-            <span className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            <span className="font-heading text-base font-bold tracking-tight text-slate-900 sm:text-lg">
               Keja<span className="text-blue-700">Space</span>
             </span>
           </Link>
