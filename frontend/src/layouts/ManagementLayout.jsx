@@ -3,31 +3,51 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 
 import useAuth from "../hooks/useAuth";
 import LogoutButton from "../components/auth/LogoutButton";
+import ManagementIcon from "../components/common/ManagementIcon";
 
 const staffLinks = [
-  { label: "Dashboard", to: "/staff/dashboard" },
-  
-  { label: "Applications", to: "/staff/applications" },
-  { label: "Resident stays", to: "/staff/stays" },
-  { label: "Rent & payments", to: "/staff/rent-payments" },
-  { label: "Maintenance", to: "/staff/maintenance" },
-  { label: "Visitors", to: "/staff/visitors" },
-  { label: "Hostel notices", to: "/staff/notices" },
+  { label: "Dashboard", to: "/staff/dashboard", icon: "dashboard" },
+  { label: "Applications", to: "/staff/applications", icon: "applications" },
+  { label: "Resident stays", to: "/staff/stays", icon: "stays" },
+  { label: "Rent & payments", to: "/staff/rent-payments", icon: "payments" },
+  { label: "Maintenance", to: "/staff/maintenance", icon: "maintenance" },
+  { label: "Visitors", to: "/staff/visitors", icon: "visitors" },
+  { label: "Hostel notices", to: "/staff/notices", icon: "notices" },
 ];
 
 const adminLinks = [
-  { label: "Manage rooms", to: "/admin/rooms" },
-  { label: "Manage users", to: "/admin/users" },
-  { label: "Manage announcements", to: "/admin/announcements" },
+  { label: "Manage rooms", to: "/admin/rooms", icon: "rooms" },
+  { label: "Manage users", to: "/admin/users", icon: "users" },
+  {
+    label: "Announcements",
+    to: "/admin/announcements",
+    icon: "notices",
+  },
 ];
 
-function navigationStyle({ isActive }) {
-  return [
-    "block rounded-xl px-3 py-2.5 text-sm font-medium transition",
-    isActive
-      ? "bg-blue-50 text-blue-700"
-      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-  ].join(" ");
+function SidebarLinks({ links, onNavigate }) {
+  return (
+    <div className="space-y-1">
+      {links.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition ${
+              isActive
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            }`
+          }
+        >
+          <ManagementIcon name={item.icon} className="size-4 shrink-0" />
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </div>
+  );
 }
 
 export default function ManagementLayout() {
@@ -56,26 +76,39 @@ export default function ManagementLayout() {
 
     window.addEventListener("keydown", handleKeyDown);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen]);
 
-  function renderLinks(links) {
-    return links.map((item) => (
-      <NavLink
-        key={item.to}
-        to={item.to}
-        className={navigationStyle}
-        onClick={() => setMenuOpen(false)}
-      >
-        {item.label}
-      </NavLink>
-    ));
+  function renderNavigation() {
+    return (
+      <>
+        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+          Navigation
+        </p>
+
+        <SidebarLinks
+          links={staffLinks}
+          onNavigate={() => setMenuOpen(false)}
+        />
+
+        {isAdmin && (
+          <div className="mt-6">
+            <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Administration
+            </p>
+
+            <SidebarLinks
+              links={adminLinks}
+              onNavigate={() => setMenuOpen(false)}
+            />
+          </div>
+        )}
+      </>
+    );
   }
 
   return (
-    <div className="min-h-dvh min-w-0 bg-[#f5f7fb]">
+    <div className="min-h-dvh min-w-0 bg-gradient-to-br from-slate-50 via-[#f1fbfc] to-slate-50">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-blue-700"
@@ -83,84 +116,34 @@ export default function ManagementLayout() {
         Skip to content
       </a>
 
-      {/* Mobile header and expandable navigation */}
-      <header className="border-b border-slate-200 bg-white lg:hidden">
-        <div className="flex h-16 items-center justify-between gap-3 px-4">
-          <Link
-            to="/"
-            className="font-heading text-lg font-bold text-slate-900"
-          >
-            Keja<span className="text-blue-700">Space</span>
+      {/* Mobile navigation */}
+      <header className="border-b border-slate-200/70 bg-white lg:hidden">
+        <div className="flex h-16 items-center justify-between px-4">
+          <Link to="/" className="font-heading text-base font-bold text-slate-900">
+            Keja<span className="text-blue-600">Space</span>
           </Link>
 
           <button
             ref={toggleRef}
             type="button"
             aria-expanded={menuOpen}
-            aria-controls="management-mobile-navigation"
+            aria-controls="management-mobile-menu"
             onClick={() => setMenuOpen((previous) => !previous)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              {menuOpen ? (
-                <>
-                  <path d="M6 6l12 12" />
-                  <path d="M6 18L18 6" />
-                </>
-              ) : (
-                <>
-                  <path d="M4 6h16" />
-                  <path d="M4 12h16" />
-                  <path d="M4 18h16" />
-                </>
-              )}
-            </svg>
-
-            {menuOpen ? "Close" : "Menu"}
+            {menuOpen ? "Close menu" : "☰ Menu"}
           </button>
         </div>
 
         <div
-          id="management-mobile-navigation"
+          id="management-mobile-menu"
           hidden={!menuOpen}
-          className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-slate-100 p-4"
+          className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-slate-100 p-3"
         >
-          <p className="break-words text-sm font-semibold text-slate-900">
-            {user?.username}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">{roleLabel}</p>
+          {renderNavigation()}
 
-          <nav aria-label="Mobile management navigation" className="mt-4">
-            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Hostel operations
-            </p>
-
-            <div className="space-y-1">{renderLinks(staffLinks)}</div>
-
-            {isAdmin && (
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Administration
-                </p>
-                <div className="space-y-1">{renderLinks(adminLinks)}</div>
-              </div>
-            )}
-          </nav>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <Link
-              to="/"
-              className="text-sm font-medium text-slate-600 hover:text-blue-700"
-            >
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <Link to="/" className="text-sm text-slate-600">
               View website
             </Link>
             <LogoutButton />
@@ -169,82 +152,66 @@ export default function ManagementLayout() {
       </header>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="border-b border-slate-100 px-5 py-5">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 font-heading text-lg font-bold text-slate-900"
+      <aside className="fixed inset-y-0 left-0 hidden w-52 flex-col border-r border-slate-200/70 bg-white lg:flex">
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 px-5 py-6 font-heading text-base font-bold text-slate-900"
+        >
+          <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 text-xs text-white">
+            K
+          </span>
+          KejaSpace
+        </Link>
+
+        <div className="mx-3 flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5">
+          <span
+            aria-hidden="true"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-bold text-blue-700"
           >
-            <span
-              aria-hidden="true"
-              className="flex size-8 items-center justify-center rounded-xl bg-blue-700 text-sm text-white"
-            >
-              K
-            </span>
+            {user?.username?.charAt(0).toUpperCase() || "K"}
+          </span>
 
-            <span>
-              Keja<span className="text-blue-700">Space</span>
-            </span>
-          </Link>
-
-          <div className="mt-5 rounded-xl bg-slate-50 px-3 py-3">
-            <p className="truncate text-sm font-semibold text-slate-900">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-slate-700">
               {user?.username}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{roleLabel}</p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-400">
+              {roleLabel}
+            </p>
           </div>
         </div>
 
         <nav
           aria-label="Management navigation"
-          className="min-h-0 flex-1 overflow-y-auto p-3"
+          className="min-h-0 flex-1 overflow-y-auto px-3 py-6"
         >
-          <p className="mb-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Hostel operations
-          </p>
-
-          <div className="space-y-1">{renderLinks(staffLinks)}</div>
-
-          {isAdmin && (
-            <div className="mt-5 border-t border-slate-100 pt-4">
-              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Administration
-              </p>
-              <div className="space-y-1">{renderLinks(adminLinks)}</div>
-            </div>
-          )}
+          {renderNavigation()}
         </nav>
 
-        <div className="space-y-4 border-t border-slate-100 p-5">
+        <div className="space-y-3 border-t border-slate-100 p-4">
           <Link
             to="/"
-            className="block text-sm font-medium text-slate-600 hover:text-blue-700"
+            className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-blue-700"
           >
-            ← View website
+            <ManagementIcon name="arrow" />
+            View website
           </Link>
 
           <LogoutButton />
         </div>
       </aside>
 
-      {/* Current page */}
-      <div className="min-w-0 lg:pl-60">
-        <header className="hidden h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 lg:flex">
-          <p className="text-sm font-medium text-slate-600">
-            Hostel management
-          </p>
-          <p className="text-xs text-slate-500">{roleLabel} workspace</p>
-        </header>
-
+      {/* Pages render here */}
+      <div className="min-w-0 lg:pl-52">
         <main
           id="main-content"
           tabIndex={-1}
-          className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6 sm:px-6"
+          className="mx-auto w-full min-w-0 max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
         >
           {authError && (
             <p
               role="alert"
-              className="mb-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+              className="mb-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
             >
               {authError}
             </p>
