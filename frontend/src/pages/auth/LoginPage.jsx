@@ -60,7 +60,7 @@ export default function LoginPage() {
 
     return (
       <Navigate
-        to={isManagement ? "/staff/applications" : "/my-applications"}
+        to={isManagement ? "/staff/dashboard" : "/my-applications"}
         replace
       />
     );
