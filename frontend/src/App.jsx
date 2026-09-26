@@ -33,6 +33,7 @@ import MaintenancePage from "./pages/staff/MaintenancePage";
 import VisitorsPage from "./pages/staff/VisitorsPage";
 import StaysPage from "./pages/staff/StaysPage";
 import RentPaymentsPage from "./pages/staff/RentPaymentsPage";
+import DashboardPage from "./pages/staff/DashboardPage";
 
 // Admin pages
 import ManageAnnouncementsPage from "./pages/admin/ManageAnnouncementsPage";
@@ -54,30 +55,15 @@ export default function App() {
         <Route path="unauthorized" element={<UnauthorizedPage />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route
-            path="announcements"
-            element={<AnnouncementsPage />}
-          />
+          <Route path="announcements" element={<AnnouncementsPage />} />
 
           <Route element={<RoleRoute allowedRoles={["resident"]} />}>
-            <Route
-              path="rooms/:id/apply"
-              element={<ApplyPage />}
-            />
-            <Route
-              path="my-applications"
-              element={<MyApplicationsPage />}
-            />
+            <Route path="rooms/:id/apply" element={<ApplyPage />} />
+            <Route path="my-applications" element={<MyApplicationsPage />} />
             <Route path="my-stay" element={<MyStayPage />} />
             <Route path="my-charges" element={<MyChargesPage />} />
-            <Route
-              path="my-maintenance"
-              element={<MyMaintenancePage />}
-            />
-            <Route
-              path="my-visitors"
-              element={<MyVisitorsPage />}
-            />
+            <Route path="my-maintenance" element={<MyMaintenancePage />} />
+            <Route path="my-visitors" element={<MyVisitorsPage />} />
           </Route>
         </Route>
 
@@ -86,45 +72,23 @@ export default function App() {
 
       {/* Separate staff/admin area */}
       <Route element={<ProtectedRoute />}>
-        <Route
-          element={<RoleRoute allowedRoles={["staff", "admin"]} />}
-        >
+        <Route element={<RoleRoute allowedRoles={["staff", "admin"]} />}>
           <Route element={<ManagementLayout />}>
-            <Route
-              path="staff/applications"
-              element={<ApplicationsPage />}
-            />
+            <Route path="staff/applications" element={<ApplicationsPage />} />
+            <Route path="staff/dashboard" element={<DashboardPage />} />
             <Route path="staff/stays" element={<StaysPage />} />
-            <Route
-              path="staff/maintenance"
-              element={<MaintenancePage />}
-            />
-            <Route
-              path="staff/visitors"
-              element={<VisitorsPage />}
-            />
-            <Route
-              path="staff/rent-payments"
-              element={<RentPaymentsPage />}
-            />
-            <Route
-              path="staff/notices"
-              element={<AnnouncementsPage />}
-            />
+            <Route path="staff/maintenance" element={<MaintenancePage />} />
+            <Route path="staff/visitors" element={<VisitorsPage />} />
+            <Route path="staff/rent-payments" element={<RentPaymentsPage />} />
+            <Route path="staff/notices" element={<AnnouncementsPage />} />
 
             <Route element={<RoleRoute allowedRoles={["admin"]} />}>
               <Route
                 path="admin/announcements"
                 element={<ManageAnnouncementsPage />}
               />
-              <Route
-                path="admin/rooms"
-                element={<ManageRoomsPage />}
-              />
-              <Route
-                path="admin/users"
-                element={<ManageUsersPage />}
-              />
+              <Route path="admin/rooms" element={<ManageRoomsPage />} />
+              <Route path="admin/users" element={<ManageUsersPage />} />
             </Route>
           </Route>
         </Route>
