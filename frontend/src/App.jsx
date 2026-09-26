@@ -34,6 +34,7 @@ import VisitorsPage from "./pages/staff/VisitorsPage";
 import StaysPage from "./pages/staff/StaysPage";
 import RentPaymentsPage from "./pages/staff/RentPaymentsPage";
 import DashboardPage from "./pages/staff/DashboardPage";
+import OccupancyReportPage from "./pages/staff/OccupancyReportPage";
 
 // Admin pages
 import ManageAnnouncementsPage from "./pages/admin/ManageAnnouncementsPage";
@@ -76,6 +77,10 @@ export default function App() {
           <Route element={<ManagementLayout />}>
             <Route path="staff/applications" element={<ApplicationsPage />} />
             <Route path="staff/dashboard" element={<DashboardPage />} />
+            <Route
+              path="staff/reports/occupancy"
+              element={<OccupancyReportPage />}
+            />
             <Route path="staff/stays" element={<StaysPage />} />
             <Route path="staff/maintenance" element={<MaintenancePage />} />
             <Route path="staff/visitors" element={<VisitorsPage />} />
