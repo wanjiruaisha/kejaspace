@@ -15,12 +15,24 @@ function getErrorMessage(error) {
         : `${field.replaceAll("_", " ")}: ${text}`;
     });
 
-    if (messages.length > 0) {
-      return messages.join(" ");
-    }
+    if (messages.length > 0) return messages.join(" ");
   }
 
   return error.message || "Something went wrong. Please try again.";
+}
+
+function StatusBadge({ active }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+        active
+          ? "bg-emerald-50 text-emerald-800"
+          : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
 }
 
 export default function ManageUsersPage() {
@@ -32,6 +44,7 @@ export default function ManageUsersPage() {
   const [reload, setReload] = useState(0);
 
   const [selectedUser, setSelectedUser] = useState(null);
+  const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     is_staff: false,
     is_active: true,
@@ -41,8 +54,9 @@ export default function ManageUsersPage() {
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [needsReview, setNeedsReview] = useState(false);
+  const [reviewReloaded, setReviewReloaded] = useState(false);
 
-  const editorRef = useRef(null);
+  const panelRef = useRef(null);
   const saveInProgress = useRef(false);
 
   useEffect(() => {
@@ -62,6 +76,7 @@ export default function ManageUsersPage() {
         if (!controller.signal.aborted) {
           setUsers(data.results);
           setHasNext(Boolean(data.next));
+          setReviewReloaded(true);
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -79,27 +94,44 @@ export default function ManageUsersPage() {
     return () => controller.abort();
   }, [page, reload]);
 
-  function startEditing(user) {
-    setSelectedUser(user);
+  // Move to the details panel after it appears.
+  useEffect(() => {
+    if (!selectedUser) return;
 
-    setForm({
-      is_staff: user.is_staff,
-      is_active: user.is_active,
-    });
-
-    setActionError("");
-    setActionMessage("");
-
-    editorRef.current?.scrollIntoView({
+    panelRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
 
-    editorRef.current?.focus({ preventScroll: true });
+    panelRef.current?.focus({ preventScroll: true });
+  }, [selectedUser?.id, editing]);
+
+  function closePanel() {
+    setSelectedUser(null);
+    setEditing(false);
+  }
+
+  function viewUser(user) {
+    setSelectedUser(user);
+    setEditing(false);
+  }
+
+  function startEditing() {
+    if (!selectedUser) return;
+
+    setForm({
+      is_staff: selectedUser.is_staff,
+      is_active: selectedUser.is_active,
+    });
+
+    setActionError("");
+    setActionMessage("");
+    setEditing(true);
   }
 
   function refreshUsers() {
-    setSelectedUser(null);
+    closePanel();
+    setReviewReloaded(false);
     setReload((value) => value + 1);
   }
 
@@ -150,23 +182,21 @@ export default function ManageUsersPage() {
         ),
       );
 
-      setSelectedUser(null);
+      setSelectedUser(updatedUser);
+      setEditing(false);
       setActionMessage(
         `Access settings updated for ${updatedUser.username}.`,
       );
     } catch (err) {
-      const knownRejection = [400, 401, 403, 404, 409, 429].includes(
-        err.status,
-      );
-
-      if (knownRejection) {
+      if ([400, 401, 403, 404, 409, 429].includes(err.status)) {
         setActionError(getErrorMessage(err));
       } else {
         setActionError(
-          "We could not confirm whether the update was saved. Refresh the user list and check this account before making another change.",
+          "We could not confirm whether the update was saved. Refresh and check this account before making another change.",
         );
         setNeedsReview(true);
-        setSelectedUser(null);
+        setReviewReloaded(false);
+        closePanel();
       }
     } finally {
       saveInProgress.current = false;
@@ -180,19 +210,13 @@ export default function ManageUsersPage() {
       form.is_active !== selectedUser.is_active);
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-            Administration
-          </p>
+          <h1 className="page-title">Manage users</h1>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            Manage users
-          </h1>
-
-          <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-            Manage staff access and account activity for residents and staff.
+          <p className="page-description">
+            Manage resident and staff account access.
           </p>
         </div>
 
@@ -200,21 +224,21 @@ export default function ManageUsersPage() {
           type="button"
           onClick={refreshUsers}
           disabled={loading || saving}
-          className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold disabled:opacity-50"
+          className="button-secondary"
         >
           Refresh users
         </button>
       </div>
 
-      <p className="mt-6 rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+      <p className="mt-4 text-xs leading-5 text-slate-500">
         Administrator accounts are managed separately and do not appear here.
-        Changing account access does not remove accommodation or payment records.
+        Access changes preserve accommodation and payment records.
       </p>
 
       {actionMessage && (
         <p
           role="status"
-          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
         >
           {actionMessage}
         </p>
@@ -223,7 +247,7 @@ export default function ManageUsersPage() {
       {actionError && (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -240,10 +264,13 @@ export default function ManageUsersPage() {
 
               <button
                 type="button"
-                disabled={loading || saving || Boolean(error)}
+                disabled={
+                  loading || saving || Boolean(error) || !reviewReloaded
+                }
                 onClick={() => {
                   setNeedsReview(false);
                   setActionError("");
+                  closePanel();
                 }}
                 className="font-semibold underline disabled:opacity-50"
               >
@@ -254,79 +281,289 @@ export default function ManageUsersPage() {
         </div>
       )}
 
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-3">
-        <aside
-          ref={editorRef}
-          tabIndex={-1}
-          aria-label="Edit user access"
-          className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 lg:col-span-1"
-        >
-          {selectedUser ? (
-            <form onSubmit={handleSubmit}>
-              <h2 className="break-words text-xl font-bold text-slate-900">
-                Edit {selectedUser.username}
-              </h2>
+      <div className="mt-6">
+        {loading ? (
+          <p role="status" className="py-6 text-sm text-slate-600">
+            Loading users…
+          </p>
+        ) : error ? (
+          <div
+            role="alert"
+            className="rounded-xl bg-red-50 p-4 text-sm text-red-800"
+          >
+            <p>{error}</p>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Choose this user’s role and account status, then save.
-              </p>
+            <button
+              type="button"
+              onClick={refreshUsers}
+              className="mt-3 font-semibold underline"
+            >
+              Try again
+            </button>
 
-              <fieldset disabled={saving} className="mt-6 space-y-5">
-                <div>
-                  <label
-                    htmlFor="user-role"
-                    className="text-sm font-semibold text-slate-700"
-                  >
+            {page > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  closePanel();
+                  setPage(1);
+                }}
+                className="ml-4 mt-3 font-semibold underline"
+              >
+                Return to page 1
+              </button>
+            )}
+          </div>
+        ) : users.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
+            <h2 className="section-title">No users on this page</h2>
+            <p className="card-description">
+              Registered residents and staff will appear here.
+            </p>
+          </div>
+        ) : (
+          <div
+            role="region"
+            aria-label="Users table"
+            tabIndex={0}
+            className="max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white"
+          >
+            <table className="w-full min-w-[680px] table-fixed text-left text-sm">
+              <caption className="sr-only">
+                Residents and staff, their email addresses, roles,
+                and account statuses
+              </caption>
+
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th scope="col" className="w-[22%] px-4 py-3 font-semibold">
+                    Username
+                  </th>
+                  <th scope="col" className="w-[28%] px-4 py-3 font-semibold">
+                    Email
+                  </th>
+                  <th scope="col" className="w-[14%] px-4 py-3 font-semibold">
                     Role
-                  </label>
-
-                  <select
-                    id="user-role"
-                    value={form.is_staff ? "staff" : "resident"}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        is_staff: event.target.value === "staff",
-                      }))
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  </th>
+                  <th scope="col" className="w-[16%] px-4 py-3 font-semibold">
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="w-[20%] px-4 py-3 text-right font-semibold"
                   >
-                    <option value="resident">Resident</option>
-                    <option value="staff">Staff</option>
-                  </select>
+                    Details
+                  </th>
+                </tr>
+              </thead>
 
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    Staff can access operational features such as application
-                    approvals, stays, visitors, and maintenance.
-                  </p>
+              <tbody className="divide-y divide-slate-100">
+                {users.map((user) => (
+                  <tr
+                    key={user.id}
+                    className={
+                      selectedUser?.id === user.id
+                        ? "bg-blue-50/60"
+                        : "hover:bg-slate-50"
+                    }
+                  >
+                    <th
+                      scope="row"
+                      className="px-4 py-3 font-semibold text-slate-900"
+                    >
+                      <span className="block truncate" title={user.username}>
+                        {user.username}
+                      </span>
+                    </th>
+
+                    <td className="px-4 py-3 text-slate-600">
+                      <span className="block truncate" title={user.email || ""}>
+                        {user.email || "Not provided"}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-600">
+                      {user.is_staff ? "Staff" : "Resident"}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <StatusBadge active={user.is_active} />
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => viewUser(user)}
+                        disabled={saving}
+                        aria-label={`View details for ${user.username}`}
+                        className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        View details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <nav
+        aria-label="User pages"
+        className="mt-5 flex items-center justify-between gap-3"
+      >
+        <button
+          type="button"
+          disabled={loading || saving || page === 1}
+          onClick={() => {
+            closePanel();
+            setPage((value) => value - 1);
+          }}
+          className="button-secondary"
+        >
+          Previous
+        </button>
+
+        <span className="text-sm text-slate-500">Page {page}</span>
+
+        <button
+          type="button"
+          disabled={loading || saving || Boolean(error) || !hasNext}
+          onClick={() => {
+            closePanel();
+            setPage((value) => value + 1);
+          }}
+          className="button-secondary"
+        >
+          Next
+        </button>
+      </nav>
+
+      {selectedUser && (
+        <section
+          ref={panelRef}
+          tabIndex={-1}
+          aria-labelledby="user-details-title"
+          className="mt-6 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2
+                id="user-details-title"
+                className="section-title break-words"
+              >
+                {selectedUser.username}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Account #{selectedUser.id}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closePanel}
+              disabled={saving}
+              className="button-secondary shrink-0"
+            >
+              Close
+            </button>
+          </div>
+
+          <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div className="min-w-0">
+              <dt className="text-slate-500">Email</dt>
+              <dd className="mt-1 break-words font-medium">
+                {selectedUser.email || "Not provided"}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-slate-500">Phone number</dt>
+              <dd className="mt-1 break-words font-medium">
+                {selectedUser.phone_number || "Not provided"}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-slate-500">Current role</dt>
+              <dd className="mt-1 font-medium">
+                {selectedUser.is_staff ? "Staff" : "Resident"}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="mb-1 text-slate-500">Account status</dt>
+              <dd>
+                <StatusBadge active={selectedUser.is_active} />
+              </dd>
+            </div>
+          </dl>
+
+          {editing ? (
+            <form
+              onSubmit={handleSubmit}
+              className="mt-5 border-t border-slate-100 pt-5"
+            >
+              <h3 className="card-title">Edit access</h3>
+
+              <fieldset
+                disabled={saving || needsReview}
+                className="mt-4 space-y-4"
+              >
+                <div className="grid items-start gap-5 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="user-role" className="form-label">
+                      Role
+                    </label>
+                    <select
+                      id="user-role"
+                      value={form.is_staff ? "staff" : "resident"}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          is_staff: event.target.value === "staff",
+                        }))
+                      }
+                      className="form-input"
+                    >
+                      <option value="resident">Resident</option>
+                      <option value="staff">Staff</option>
+                    </select>
+
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Staff can manage daily hostel operations.
+                      This does not grant administrator access.
+                    </p>
+                  </div>
+
+                  <label className="flex items-start gap-3 sm:pt-7">
+                    <input
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          is_active: event.target.checked,
+                        }))
+                      }
+                      className="mt-1 size-4 accent-blue-700"
+                    />
+
+                    <span>
+                      <span className="text-sm font-medium">
+                        Account active
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-500">
+                        Uncheck to deactivate the account while keeping
+                        its records.
+                      </span>
+                    </span>
+                  </label>
                 </div>
 
-                <label className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        is_active: event.target.checked,
-                      }))
-                    }
-                    className="mt-1 size-4 accent-blue-700"
-                  />
-
-                  <span>
-                    <span className="text-sm font-semibold text-slate-700">
-                      Account active
-                    </span>
-
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
-                      Uncheck to deactivate this account while keeping its records.
-                    </span>
-                  </span>
-                </label>
-
                 {form.is_staff !== selectedUser.is_staff && (
-                  <p className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+                  <p className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
                     {form.is_staff
                       ? "Saving will give this user staff permissions."
                       : "Saving will remove this user’s staff permissions."}
@@ -334,186 +571,45 @@ export default function ManageUsersPage() {
                 )}
 
                 {!form.is_active && selectedUser.is_active && (
-                  <p className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                    You are about to deactivate this account. This does not
-                    cancel the user’s stay or settle outstanding charges.
+                  <p className="rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                    This will deactivate the account. It does not cancel
+                    the resident’s stay or settle outstanding charges.
                   </p>
                 )}
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="submit"
-                    disabled={!hasChanges || needsReview}
-                    className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+                    disabled={!hasChanges}
+                    className="button-primary"
                   >
                     {saving ? "Saving…" : "Save access"}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setSelectedUser(null)}
-                    className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold"
+                    onClick={() => setEditing(false)}
+                    className="button-secondary"
                   >
-                    Cancel
+                    Cancel edit
                   </button>
                 </div>
               </fieldset>
             </form>
           ) : (
-            <>
-              <h2 className="text-xl font-bold text-slate-900">
-                Account access
-              </h2>
-
-              <p className="mt-3 text-sm leading-7 text-slate-500">
-                Select “Edit access” on a user card to manage their role and
-                account status.
-              </p>
-            </>
-          )}
-        </aside>
-
-        <div className="lg:col-span-2">
-          {loading ? (
-            <p role="status" className="p-6 text-slate-600">
-              Loading users…
-            </p>
-          ) : error ? (
-            <div
-              role="alert"
-              className="rounded-2xl bg-red-50 p-6 text-red-800"
-            >
-              <p>{error}</p>
-
+            <div className="mt-5 border-t border-slate-100 pt-4">
               <button
                 type="button"
-                onClick={refreshUsers}
-                className="mt-4 font-semibold underline"
+                onClick={startEditing}
+                disabled={saving || needsReview}
+                className="button-primary"
               >
-                Try again
+                Edit access
               </button>
-
-              {page > 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedUser(null);
-                    setPage(1);
-                  }}
-                  className="ml-4 mt-4 font-semibold underline"
-                >
-                  Return to page 1
-                </button>
-              )}
-            </div>
-          ) : users.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
-              <h2 className="text-lg font-bold text-slate-900">
-                No users on this page
-              </h2>
-
-              <p className="mt-3 text-sm text-slate-500">
-                Registered residents and staff will appear here.
-                Superusers are excluded.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2">
-              {users.map((user) => (
-                <article
-                  key={user.id}
-                  className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-lg font-bold text-blue-700"
-                    >
-                      {user.username?.charAt(0).toUpperCase() || "U"}
-                    </span>
-
-                    <h2 className="break-words text-lg font-bold text-slate-900">
-                      {user.username}
-                    </h2>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-                      {user.is_staff ? "Staff" : "Resident"}
-                    </span>
-
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        user.is_active
-                          ? "bg-emerald-50 text-emerald-800"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {user.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-
-                  <dl className="mt-5 space-y-4 text-sm">
-                    <div>
-                      <dt className="text-slate-500">Email</dt>
-                      <dd className="mt-1 break-words font-medium text-slate-800">
-                        {user.email || "Not provided"}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-slate-500">Phone number</dt>
-                      <dd className="mt-1 break-words font-medium text-slate-800">
-                        {user.phone_number || "Not provided"}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <button
-                    type="button"
-                    onClick={() => startEditing(user)}
-                    disabled={saving || needsReview}
-                    className="mt-6 rounded-xl bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-                  >
-                    Edit access
-                  </button>
-                </article>
-              ))}
             </div>
           )}
-
-          <nav
-            aria-label="User pages"
-            className="mt-8 flex items-center justify-center gap-4"
-          >
-            <button
-              type="button"
-              disabled={loading || saving || page === 1}
-              onClick={() => {
-                setSelectedUser(null);
-                setPage((value) => value - 1);
-              }}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-            >
-              Previous
-            </button>
-
-            <span className="text-sm text-slate-600">Page {page}</span>
-
-            <button
-              type="button"
-              disabled={loading || saving || Boolean(error) || !hasNext}
-              onClick={() => {
-                setSelectedUser(null);
-                setPage((value) => value + 1);
-              }}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-            >
-              Next
-            </button>
-          </nav>
-        </div>
-      </div>
+        </section>
+      )}
     </section>
   );
 }
