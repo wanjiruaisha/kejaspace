@@ -5,6 +5,8 @@ import useAuth from "../hooks/useAuth";
 import LogoutButton from "../components/auth/LogoutButton";
 
 const staffLinks = [
+  { label: "Dashboard", to: "/staff/dashboard" },
+  
   { label: "Applications", to: "/staff/applications" },
   { label: "Resident stays", to: "/staff/stays" },
   { label: "Rent & payments", to: "/staff/rent-payments" },
