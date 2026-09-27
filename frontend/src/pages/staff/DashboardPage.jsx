@@ -247,36 +247,7 @@ export default function DashboardPage() {
               colour="amber"
             />
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Active rooms"
-              value={dashboard.rooms.active}
-              icon="rooms"
-              colour="blue"
-            />
-
-            <StatCard
-              label="Available spaces"
-              value={dashboard.rooms.available_spaces}
-              icon="check"
-              colour="green"
-            />
-
-            <StatCard
-              label="Checked-in residents"
-              value={dashboard.stays.checked_in}
-              icon="users"
-              colour="teal"
-            />
-
-            <StatCard
-              label="Pending applications"
-              value={dashboard.applications.pending}
-              icon="applications"
-              colour="amber"
-            />
-          </div>
-
+          
           {/* New chart */}
           <div className="mt-5">
             <StayStatusChart stays={dashboard.stays} />
