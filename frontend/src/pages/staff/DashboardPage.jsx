@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import useAuth from "../../hooks/useAuth";
 import LoadingMessage from "../../components/common/LoadingMessage";
 import ManagementIcon from "../../components/common/ManagementIcon";
+import StayStatusChart from "../../components/dashboard/StayStatusChart";
 import { getStaffDashboard } from "../../services/dashboardService";
 
 const numberFormatter = new Intl.NumberFormat("en-KE");
@@ -68,7 +69,9 @@ function StatCard({ label, value, icon, colour }) {
         <h2 className="font-sans text-xs font-medium text-slate-500">
           {label}
         </h2>
-        <p className={`mt-1.5 text-2xl font-semibold tracking-tight ${style.text}`}>
+        <p
+          className={`mt-1.5 text-2xl font-semibold tracking-tight ${style.text}`}
+        >
           {numberFormatter.format(value)}
         </p>
       </div>
@@ -102,7 +105,9 @@ export default function DashboardPage() {
         const data = await getStaffDashboard(controller.signal);
 
         if (!hasValidDashboard(data)) {
-          throw new Error("The server returned an unexpected dashboard response.");
+          throw new Error(
+            "The server returned an unexpected dashboard response.",
+          );
         }
 
         if (!controller.signal.aborted) {
@@ -242,6 +247,43 @@ export default function DashboardPage() {
               colour="amber"
             />
           </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Active rooms"
+              value={dashboard.rooms.active}
+              icon="rooms"
+              colour="blue"
+            />
+
+            <StatCard
+              label="Available spaces"
+              value={dashboard.rooms.available_spaces}
+              icon="check"
+              colour="green"
+            />
+
+            <StatCard
+              label="Checked-in residents"
+              value={dashboard.stays.checked_in}
+              icon="users"
+              colour="teal"
+            />
+
+            <StatCard
+              label="Pending applications"
+              value={dashboard.applications.pending}
+              icon="applications"
+              colour="amber"
+            />
+          </div>
+
+          {/* New chart */}
+          <div className="mt-5">
+            <StayStatusChart stays={dashboard.stays} />
+          </div>
+
+          {/* Your existing Needs attention and Recorded payments section
+    continues below this point. */}
 
           <div className="mt-6 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
             {/* Main list */}
@@ -251,9 +293,7 @@ export default function DashboardPage() {
                   Needs attention
                 </h2>
 
-                <span className="text-xs text-slate-400">
-                  Current activity
-                </span>
+                <span className="text-xs text-slate-400">Current activity</span>
               </div>
 
               <ul className="divide-y divide-slate-100">
@@ -349,8 +389,8 @@ export default function DashboardPage() {
             </summary>
             <div className="mt-2 max-w-2xl space-y-2 leading-6">
               <p>
-                Available spaces cover active rooms and exclude spaces used
-                by checked-in stays, reservations, and unexpired payment holds.
+                Available spaces cover active rooms and exclude spaces used by
+                checked-in stays, reservations, and unexpired payment holds.
               </p>
               <p>
                 Checked-in residents are counted across all rooms. Recorded
@@ -358,7 +398,8 @@ export default function DashboardPage() {
               </p>
               <p>
                 M-Pesa attempts marked for review are not automatically
-                successful payments. Their review screen is not connected here yet.
+                successful payments. Their review screen is not connected here
+                yet.
               </p>
             </div>
           </details>
