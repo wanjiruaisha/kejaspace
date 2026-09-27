@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import LoadingMessage from "../../components/common/LoadingMessage";
+
 import {
   listStaffVisitors,
   checkInVisitor,
@@ -45,9 +46,6 @@ const actions = {
   },
 };
 
-const secondaryButton =
-  "rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50";
-
 function formatTimestamp(value) {
   if (!value) return "Not yet";
 
@@ -70,6 +68,21 @@ function getErrorMessage(error) {
   return error.message || "The action could not be completed.";
 }
 
+function StatusBadge({ status }) {
+  const details = statusDetails[status] || {
+    label: status,
+    classes: "bg-slate-100 text-slate-700",
+  };
+
+  return (
+    <span
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${details.classes}`}
+    >
+      {details.label}
+    </span>
+  );
+}
+
 export default function VisitorsPage() {
   const [visitors, setVisitors] = useState([]);
   const [page, setPage] = useState(1);
@@ -80,13 +93,17 @@ export default function VisitorsPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
 
+  const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
+
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
   const mutationRef = useRef(false);
+  const detailsRef = useRef(null);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -103,7 +120,9 @@ export default function VisitorsPage() {
         });
 
         if (!Array.isArray(data?.results)) {
-          throw new Error("The server returned an unexpected visitor list.");
+          throw new Error(
+            "The server returned an unexpected visitor list.",
+          );
         }
 
         if (!controller.signal.aborted) {
@@ -131,19 +150,61 @@ export default function VisitorsPage() {
     return () => controller.abort();
   }, [page, status, retry]);
 
-  function refreshList() {
+  useEffect(() => {
+    if (selectedVisitor) {
+      detailsRef.current?.focus({ preventScroll: true });
+
+      detailsRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "auto",
+      });
+    }
+  }, [selectedVisitor]);
+
+  function resetDetails() {
+    setSelectedVisitor(null);
     setConfirmation(null);
+  }
+
+  function openDetails(visitor, button) {
+    if (mutationRef.current) return;
+
+    triggerRef.current = button;
+    setSelectedVisitor(visitor);
+    setConfirmation(null);
+    setSuccessMessage("");
+
+    if (!needsRefresh) {
+      setActionError("");
+    }
+  }
+
+  function closeDetails() {
+    if (mutationRef.current) return;
+
+    resetDetails();
+
+    if (triggerRef.current?.isConnected) {
+      triggerRef.current.focus();
+    }
+  }
+
+  function refreshList() {
+    resetDetails();
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
-  function openConfirmation(visitor, action) {
+  function openConfirmation(visitor, actionName) {
+    if (mutationRef.current || needsRefresh || loading) return;
+
     setActionError("");
     setSuccessMessage("");
+
     setConfirmation({
       id: visitor.id,
       fullName: visitor.full_name,
-      action,
+      action: actionName,
     });
   }
 
@@ -160,6 +221,8 @@ export default function VisitorsPage() {
     const selected = confirmation;
     const action = actions[selected.action];
 
+    if (!action) return;
+
     mutationRef.current = true;
     setBusy(true);
     setActionError("");
@@ -172,13 +235,17 @@ export default function VisitorsPage() {
         updated?.id !== selected.id ||
         updated.status !== action.expectedResult
       ) {
-        throw new Error("The server returned an unexpected action result.");
+        throw new Error(
+          "The server returned an unexpected action result.",
+        );
       }
 
       const resultLabel = statusDetails[updated.status].label;
 
       setSuccessMessage(`${selected.fullName}: ${resultLabel}.`);
       setNeedsRefresh(true);
+
+      // The updated visitor may no longer match the status filter.
       setPage(1);
       refreshList();
     } catch (error) {
@@ -197,6 +264,7 @@ export default function VisitorsPage() {
         }
       } else {
         setNeedsRefresh(true);
+
         setActionError(
           "We could not confirm the action. Refresh the visitor list " +
             "and check the current status before trying again.",
@@ -209,26 +277,41 @@ export default function VisitorsPage() {
   }
 
   function changePage(nextPage) {
-    setConfirmation(null);
-    setActionError("");
+    resetDetails();
+
+    if (!needsRefresh) {
+      setActionError("");
+    }
+
     setSuccessMessage("");
     setLoading(true);
     setPage(nextPage);
   }
 
+  function changeFilter(event) {
+    resetDetails();
+
+    if (!needsRefresh) {
+      setActionError("");
+    }
+
+    setSuccessMessage("");
+    setLoading(true);
+    setStatus(event.target.value);
+    setPage(1);
+  }
+
   return (
-    <section>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="min-w-0 space-y-5">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
             Hostel management
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            Visitor management
-          </h1>
+          <h1 className="page-title mt-2">Visitor management</h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-slate-500">
+          <p className="page-description">
             Review expected visitors and record their arrival and departure.
           </p>
         </div>
@@ -237,16 +320,16 @@ export default function VisitorsPage() {
           type="button"
           onClick={refreshList}
           disabled={loading || busy}
-          className={secondaryButton}
+          className="button-secondary"
         >
           Refresh
         </button>
-      </div>
+      </header>
 
       {successMessage && (
         <p
           role="status"
-          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
         >
           {successMessage}
         </p>
@@ -255,7 +338,7 @@ export default function VisitorsPage() {
       {actionError && (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -272,216 +355,343 @@ export default function VisitorsPage() {
         </div>
       )}
 
-      <div className="mt-6">
-        <label
-          htmlFor="visitor-status-filter"
-          className="block text-sm font-semibold text-slate-700"
-        >
-          Filter by status
-        </label>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="w-full sm:max-w-xs">
+          <label htmlFor="visitor-status-filter" className="form-label">
+            Filter by status
+          </label>
 
-        <select
-          id="visitor-status-filter"
-          value={status}
-          disabled={loading || busy}
-          onChange={(event) => {
-            setConfirmation(null);
-            setActionError("");
-            setSuccessMessage("");
-            setLoading(true);
-            setStatus(event.target.value);
-            setPage(1);
-          }}
-          className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm sm:w-64"
-        >
-          <option value="">All visitors</option>
-          <option value="expected">Expected</option>
-          <option value="checked_in">Checked in</option>
-          <option value="checked_out">Checked out</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+          <select
+            id="visitor-status-filter"
+            value={status}
+            disabled={loading || busy}
+            onChange={changeFilter}
+            className="form-input"
+          >
+            <option value="">All visitors</option>
+
+            {Object.entries(statusDetails).map(([value, details]) => (
+              <option key={value} value={value}>
+                {details.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
-        <div className="mt-8">
-          <LoadingMessage label="Loading visitors…" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <LoadingMessage label="Loading visitors…" compact />
         </div>
       ) : listError ? (
         <div
           role="alert"
-          className="mt-8 rounded-xl bg-red-50 p-6 text-red-800"
+          className="rounded-xl bg-red-50 p-5 text-sm text-red-800"
         >
           <p>{listError}</p>
 
           <button
             type="button"
             onClick={refreshList}
+            disabled={busy}
             className="mt-3 font-semibold underline"
           >
             Try again
           </button>
         </div>
       ) : visitors.length === 0 ? (
-        <p className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-          No visitors match this view.
-        </p>
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+          <h2 className="text-base font-semibold text-slate-900">
+            No visitors found
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-500">
+            No visits match the selected status.
+          </p>
+        </div>
       ) : (
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">
-          {visitors.map((visitor) => {
-            const details = statusDetails[visitor.status] || {
-              label: visitor.status,
-              classes: "bg-slate-100 text-slate-700",
-            };
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] table-fixed text-left text-sm">
+              <caption className="sr-only">
+                Visitors, host residents, visit dates and current status
+              </caption>
 
-            return (
-              <article
-                key={visitor.id}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-slate-500">
-                    Visit #{visitor.id}
-                  </p>
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th scope="col" className="w-[25%] px-4 py-3">
+                    Visitor
+                  </th>
+                  <th scope="col" className="w-[20%] px-4 py-3">
+                    Host resident
+                  </th>
+                  <th scope="col" className="w-[10%] px-4 py-3">
+                    Room
+                  </th>
+                  <th scope="col" className="w-[15%] px-4 py-3">
+                    Visit date
+                  </th>
+                  <th scope="col" className="w-[15%] px-4 py-3">
+                    Status
+                  </th>
+                  <th scope="col" className="w-[15%] px-4 py-3">
+                    Details
+                  </th>
+                </tr>
+              </thead>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${details.classes}`}
+              <tbody className="divide-y divide-slate-100">
+                {visitors.map((visitor) => (
+                  <tr
+                    key={visitor.id}
+                    className={
+                      selectedVisitor?.id === visitor.id
+                        ? "bg-blue-50/60"
+                        : "hover:bg-slate-50"
+                    }
                   >
-                    {details.label}
-                  </span>
-                </div>
-
-                <h2 className="mt-4 break-words text-xl font-bold text-slate-900">
-                  {visitor.full_name}
-                </h2>
-
-                <dl className="mt-5 space-y-3 text-sm">
-                  {[
-                    ["Host resident", visitor.resident_username],
-                    ["Room", visitor.room_number],
-                    ["Phone", visitor.phone_number || "Not provided"],
-                    ["Visit date", visitor.visit_date],
-                    ["Checked in", formatTimestamp(visitor.check_in_at)],
-                    ["Checked out", formatTimestamp(visitor.check_out_at)],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="flex justify-between gap-4"
+                    <th
+                      scope="row"
+                      className="px-4 py-3 font-medium text-slate-900"
                     >
-                      <dt className="text-slate-500">{label}</dt>
-                      <dd className="break-words text-right font-medium text-slate-900">
-                        {value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                      <p className="truncate" title={visitor.full_name}>
+                        {visitor.full_name}
+                      </p>
 
-                {visitor.purpose && (
-                  <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
-                    {visitor.purpose}
-                  </p>
-                )}
+                      <p className="mt-1 text-xs font-normal text-slate-500">
+                        Visit #{visitor.id}
+                      </p>
+                    </th>
 
-                {confirmation?.id === visitor.id ? (
-                  <div className="mt-6 rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-800">
-                      {actions[confirmation.action].label} for{" "}
-                      {visitor.full_name}?
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={handleConfirm}
-                        disabled={busy || needsRefresh}
-                        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    <td className="px-4 py-3 text-slate-600">
+                      <p
+                        className="truncate"
+                        title={visitor.resident_username}
                       >
-                        {busy ? "Saving…" : "Confirm"}
-                      </button>
+                        {visitor.resident_username || "Unavailable"}
+                      </p>
+                    </td>
 
+                    <td className="px-4 py-3 text-slate-600">
+                      <p className="truncate" title={visitor.room_number}>
+                        {visitor.room_number}
+                      </p>
+                    </td>
+
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                      {visitor.visit_date}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <StatusBadge status={visitor.status} />
+                    </td>
+
+                    <td className="px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => setConfirmation(null)}
-                        disabled={busy}
-                        className={secondaryButton}
-                      >
-                        Go back
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    {visitor.status === "expected" && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openConfirmation(visitor, "check-in")
-                          }
-                          disabled={busy || needsRefresh}
-                          className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                        >
-                          Check in
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openConfirmation(visitor, "cancel")
-                          }
-                          disabled={busy || needsRefresh}
-                          className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
-                        >
-                          Cancel visit
-                        </button>
-                      </>
-                    )}
-
-                    {visitor.status === "checked_in" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openConfirmation(visitor, "check-out")
+                        onClick={(event) =>
+                          openDetails(visitor, event.currentTarget)
                         }
-                        disabled={busy || needsRefresh}
-                        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        disabled={busy}
+                        aria-label={`View details for visit ${visitor.id}`}
+                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                       >
-                        Check out
+                        View details
                       </button>
-                    )}
-                  </div>
-                )}
-              </article>
-            );
-          })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       <nav
         aria-label="Staff visitor pages"
-        className="mt-8 flex items-center justify-center gap-4"
+        className="flex items-center justify-between gap-3"
       >
         <button
           type="button"
           disabled={loading || busy || page === 1}
           onClick={() => changePage(page - 1)}
-          className={secondaryButton}
+          className="button-secondary"
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-600">
-          Page {page}
-        </span>
+        <span className="text-sm text-slate-500">Page {page}</span>
 
         <button
           type="button"
           disabled={loading || busy || Boolean(listError) || !hasNext}
           onClick={() => changePage(page + 1)}
-          className={secondaryButton}
+          className="button-secondary"
         >
           Next
         </button>
       </nav>
+
+      {selectedVisitor && !loading && !listError && (
+        <section
+          ref={detailsRef}
+          tabIndex={-1}
+          aria-labelledby="visitor-details-title"
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">
+                Visit #{selectedVisitor.id}
+              </p>
+
+              <h2
+                id="visitor-details-title"
+                className="mt-2 break-words font-heading text-base font-semibold text-slate-900"
+              >
+                {selectedVisitor.full_name}
+              </h2>
+
+              <div className="mt-3">
+                <StatusBadge status={selectedVisitor.status} />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeDetails}
+              disabled={busy}
+              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Close
+            </button>
+          </div>
+
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              ["Host resident", selectedVisitor.resident_username],
+              ["Room", selectedVisitor.room_number],
+              ["Phone", selectedVisitor.phone_number || "Not provided"],
+              ["Visit date", selectedVisitor.visit_date],
+              [
+                "Checked in · Nairobi",
+                formatTimestamp(selectedVisitor.check_in_at),
+              ],
+              [
+                "Checked out · Nairobi",
+                formatTimestamp(selectedVisitor.check_out_at),
+              ],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="text-xs text-slate-500">{label}</dt>
+
+                <dd className="mt-1 break-words text-sm font-medium text-slate-800">
+                  {value || "Unavailable"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-5 border-t border-slate-100 pt-5">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Purpose of visit
+            </h3>
+
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
+              {selectedVisitor.purpose || "No purpose provided."}
+            </p>
+          </div>
+
+          {confirmation?.id === selectedVisitor.id ? (
+            <div className="mt-5 rounded-xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-800">
+                {actions[confirmation.action].label} for{" "}
+                {selectedVisitor.full_name}?
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={busy || needsRefresh}
+                  className="button-primary"
+                >
+                  {busy ? "Saving…" : "Confirm"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmation(null)}
+                  disabled={busy}
+                  className="button-secondary"
+                >
+                  Go back
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 border-t border-slate-100 pt-5">
+              {selectedVisitor.status === "expected" && (
+                <>
+                  <p className="mb-3 text-xs leading-5 text-slate-500">
+                    Check-in is allowed on the scheduled visit date while
+                    the host resident is still checked in.
+                  </p>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openConfirmation(selectedVisitor, "check-in")
+                      }
+                      disabled={busy || needsRefresh}
+                      className="button-primary"
+                    >
+                      Check in
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openConfirmation(selectedVisitor, "cancel")
+                      }
+                      disabled={busy || needsRefresh}
+                      className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Cancel visit
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {selectedVisitor.status === "checked_in" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openConfirmation(selectedVisitor, "check-out")
+                  }
+                  disabled={busy || needsRefresh}
+                  className="button-primary"
+                >
+                  Check out
+                </button>
+              )}
+
+              {selectedVisitor.status === "checked_out" && (
+                <p className="text-sm text-slate-500">
+                  This visit has ended.
+                </p>
+              )}
+
+              {selectedVisitor.status === "cancelled" && (
+                <p className="text-sm text-slate-500">
+                  This visit was cancelled.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
     </section>
   );
 }
