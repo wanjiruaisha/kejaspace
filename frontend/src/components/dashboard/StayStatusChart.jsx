@@ -6,43 +6,46 @@ export default function StayStatusChart({ stays }) {
   const items = [
     {
       label: "Checked in",
-      description: "Residents who have moved in",
       value: stays.checked_in,
-      barClass: "bg-teal-500",
+      colour: "#14b8a6",
       dotClass: "bg-teal-500",
     },
     {
       label: "Reserved",
-      description: "Confirmed stays awaiting arrival",
       value: stays.reserved,
-      barClass: "bg-blue-500",
+      colour: "#3b82f6",
       dotClass: "bg-blue-500",
     },
     {
       label: "Payment holds",
-      description: "Awaiting payment within the deadline",
       value: stays.unexpired_payment_holds,
-      barClass: "bg-amber-400",
+      colour: "#fbbf24",
       dotClass: "bg-amber-400",
     },
   ];
 
   const total = items.reduce((sum, item) => sum + item.value, 0);
-  const largestValue = Math.max(...items.map((item) => item.value));
 
-  // Four equal intervals, with whole-number labels.
-  const tickSize = Math.max(1, Math.ceil(largestValue / 4));
-  const scaleMaximum = tickSize * 4;
+  let position = 0;
 
-  const ticks = Array.from(
-    { length: 5 },
-    (_, index) => index * tickSize,
-  );
+  const segments = items.map((item) => {
+    const start = position;
+    const percentage = total > 0 ? (item.value / total) * 100 : 0;
+
+    position += percentage;
+
+    return `${item.colour} ${start}% ${position}%`;
+  });
+
+  const background =
+    total > 0
+      ? `conic-gradient(${segments.join(", ")})`
+      : "#e2e8f0";
 
   return (
     <section
       aria-labelledby="stay-chart-title"
-      className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm sm:p-5"
+      className="min-w-0 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm sm:p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -54,11 +57,11 @@ export default function StayStatusChart({ stays }) {
             id="stay-chart-title"
             className="mt-1 font-heading text-base font-semibold text-slate-900"
           >
-            Stay status overview
+            Stay status
           </h2>
 
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Compare arrivals, reservations and active payment holds.
+            Checked-in residents, reservations and unexpired holds.
           </p>
         </div>
 
@@ -70,88 +73,74 @@ export default function StayStatusChart({ stays }) {
         </Link>
       </div>
 
-      {total === 0 ? (
-        <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-          <p className="text-sm font-medium text-slate-700">
-            No current stays in these categories
+      <div className="mt-6 grid items-center gap-6 sm:grid-cols-[220px_minmax(0,1fr)]">
+        {/* The text legend below provides the accessible chart values. */}
+        <div
+          aria-hidden="true"
+          className="relative mx-auto flex size-48 items-center justify-center rounded-full sm:size-52"
+          style={{ background }}
+        >
+          <div className="flex size-36 flex-col items-center justify-center rounded-full bg-white sm:size-40">
+            <span className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
+              {numberFormatter.format(total)}
+            </span>
+
+            <span className="mt-1 text-xs text-slate-500">
+              Current stays
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <p className="sr-only">
+            Total current stays: {numberFormatter.format(total)}.
           </p>
 
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            The chart will show values when there are checked-in residents,
-            reservations or unexpired payment holds.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Visible labels and counts also make the chart readable
-              without relying on bar colours or bar lengths. */}
-          <dl className="mt-6 space-y-5">
+          <dl className="space-y-3">
             {items.map((item) => {
-              const width = (item.value / scaleMaximum) * 100;
+              const percentage =
+                total > 0 ? (item.value / total) * 100 : 0;
 
               return (
-                <div key={item.label}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <dt className="flex items-center gap-2 text-sm text-slate-700">
-                      <span
-                        aria-hidden="true"
-                        className={`size-2.5 shrink-0 rounded-full ${item.dotClass}`}
-                      />
-                      {item.label}
-                    </dt>
-
-                    <dd className="text-sm font-semibold tabular-nums text-slate-900">
-                      {numberFormatter.format(item.value)}
-                    </dd>
-                  </div>
-
-                  <div
-                    aria-hidden="true"
-                    className="relative h-7 overflow-hidden rounded-lg bg-slate-50"
-                  >
-                    <div className="absolute inset-0 flex justify-between">
-                      {ticks.map((tick) => (
-                        <span
-                          key={tick}
-                          className="h-full w-px bg-slate-200/80"
-                        />
-                      ))}
-                    </div>
-
-                    <div
-                      className={`relative h-full rounded-r-lg ${item.barClass}`}
-                      style={{ width: `${width}%` }}
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-3"
+                >
+                  <dt className="flex items-center gap-2 text-sm text-slate-700">
+                    <span
+                      aria-hidden="true"
+                      className={`size-2.5 shrink-0 rounded-full ${item.dotClass}`}
                     />
-                  </div>
 
-                  <p className="mt-1.5 text-xs text-slate-500">
-                    {item.description}
-                  </p>
+                    {item.label}
+                  </dt>
+
+                  <dd className="shrink-0 text-right">
+                    <span className="text-sm font-semibold tabular-nums text-slate-900">
+                      {numberFormatter.format(item.value)}
+                    </span>
+
+                    <span className="ml-2 text-xs tabular-nums text-slate-500">
+                      ({percentage.toFixed(1)}%)
+                    </span>
+                  </dd>
                 </div>
               );
             })}
           </dl>
 
-          <div
-            aria-hidden="true"
-            className="mt-4 flex justify-between border-t border-slate-100 pt-2 text-[11px] tabular-nums text-slate-500"
-          >
-            {ticks.map((tick) => (
-              <span key={tick}>
-                {numberFormatter.format(tick)}
-              </span>
-            ))}
-          </div>
+          {total === 0 && (
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              No stays currently fall into these categories. The ring will
+              show coloured segments when there is data.
+            </p>
+          )}
+        </div>
+      </div>
 
-          <p className="mt-1 text-center text-xs text-slate-500">
-            Number of stays
-          </p>
-        </>
-      )}
-
-      <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">
-        Counts cover all rooms. This compares stay statuses, not the
-        percentage of room capacity occupied.
+      <p className="mt-5 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">
+        Percentages show each category’s share of these current stays
+        across all rooms. They do not represent room occupancy.
       </p>
     </section>
   );
