@@ -14,12 +14,6 @@ const emptyForm = {
   is_published: false,
 };
 
-const inputClass =
-  "mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm";
-
-const secondaryButton =
-  "rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50";
-
 function getErrorMessage(error) {
   if (typeof error.data?.detail === "string") {
     return error.data.detail;
@@ -40,6 +34,34 @@ function getErrorMessage(error) {
   return error.message || "The action could not be completed.";
 }
 
+function formatDate(value) {
+  if (!value) return "Unavailable";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  return new Intl.DateTimeFormat("en-KE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Africa/Nairobi",
+  }).format(date);
+}
+
+function PublicationBadge({ published }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+        published
+          ? "bg-emerald-50 text-emerald-800"
+          : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {published ? "Published" : "Draft"}
+    </span>
+  );
+}
+
 export default function ManageAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [page, setPage] = useState(1);
@@ -50,17 +72,23 @@ export default function ManageAnnouncementsPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
 
+  // Panel can be null, "view", "create" or "edit".
+  const [panel, setPanel] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ ...emptyForm });
-  const [editingId, setEditingId] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
   const [needsCheck, setNeedsCheck] = useState(false);
+  const [reviewReloaded, setReviewReloaded] = useState(false);
 
   const mutationRef = useRef(false);
+  const panelRef = useRef(null);
   const titleRef = useRef(null);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,6 +96,7 @@ export default function ManageAnnouncementsPage() {
     async function loadAnnouncements() {
       setLoading(true);
       setListError("");
+      setReviewReloaded(false);
 
       try {
         const data = await listAdminAnnouncements({
@@ -83,6 +112,7 @@ export default function ManageAnnouncementsPage() {
         if (!controller.signal.aborted) {
           setAnnouncements(data.results);
           setHasNext(Boolean(data.next));
+          setReviewReloaded(true);
         }
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -104,34 +134,103 @@ export default function ManageAnnouncementsPage() {
     return () => controller.abort();
   }, [page, published, retry]);
 
+  useEffect(() => {
+    if (!panel) return;
+
+    const target =
+      panel === "create" || panel === "edit"
+        ? titleRef.current
+        : panelRef.current;
+
+    target?.focus({ preventScroll: true });
+
+    panelRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "auto",
+    });
+  }, [panel, selected?.id]);
+
+  function resetPanel() {
+    setPanel(null);
+    setSelected(null);
+    setConfirmDelete(false);
+    setForm({ ...emptyForm });
+  }
+
+  function closePanel() {
+    if (mutationRef.current) return;
+
+    resetPanel();
+
+    if (triggerRef.current?.isConnected) {
+      triggerRef.current.focus();
+    }
+  }
+
   function refreshList() {
+    resetPanel();
+    setReviewReloaded(false);
     setLoading(true);
     setRetry((value) => value + 1);
-  }
-
-  function resetForm() {
-    setForm({ ...emptyForm });
-    setEditingId(null);
-  }
-
-  function startEditing(announcement) {
-    setEditingId(announcement.id);
-    setForm({
-      title: announcement.title,
-      message: announcement.message,
-      is_published: announcement.is_published,
-    });
-    setDeleteId(null);
-    setActionError("");
-    setSuccessMessage("");
-
-    titleRef.current?.focus();
   }
 
   function showLatestList() {
     setPublished("");
     setPage(1);
     refreshList();
+  }
+
+  function startCreating(button) {
+    if (mutationRef.current || needsCheck) return;
+
+    triggerRef.current = button;
+    setSelected(null);
+    setForm({ ...emptyForm });
+    setConfirmDelete(false);
+    setActionError("");
+    setSuccessMessage("");
+    setPanel("create");
+  }
+
+  function openDetails(announcement, button) {
+    if (mutationRef.current) return;
+
+    triggerRef.current = button;
+    setSelected(announcement);
+    setConfirmDelete(false);
+    setSuccessMessage("");
+
+    if (!needsCheck) setActionError("");
+
+    setPanel("view");
+  }
+
+  function startEditing() {
+    if (!selected || mutationRef.current || needsCheck) return;
+
+    setForm({
+      title: selected.title,
+      message: selected.message,
+      is_published: selected.is_published,
+    });
+
+    setConfirmDelete(false);
+    setActionError("");
+    setSuccessMessage("");
+    setPanel("edit");
+  }
+
+  function changePage(nextPage) {
+    resetPanel();
+    setLoading(true);
+    setPage(nextPage);
+  }
+
+  function changeFilter(event) {
+    resetPanel();
+    setPublished(event.target.value);
+    setPage(1);
+    setLoading(true);
   }
 
   function handleMutationError(error) {
@@ -143,17 +242,18 @@ export default function ManageAnnouncementsPage() {
       );
 
       if (error.status === 404) {
-        setDeleteId(null);
-        resetForm();
+        setPage(1);
         refreshList();
       }
     } else {
       setNeedsCheck(true);
-      setDeleteId(null);
+      setReviewReloaded(false);
+
       setActionError(
         "We could not confirm whether the change was saved. " +
-          "Check the refreshed list before making another change.",
+          "Check the refreshed list and notice details before making another change.",
       );
+
       showLatestList();
     }
   }
@@ -161,7 +261,17 @@ export default function ManageAnnouncementsPage() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (mutationRef.current || needsCheck) return;
+    if (
+      mutationRef.current ||
+      needsCheck ||
+      !["create", "edit"].includes(panel)
+    ) {
+      return;
+    }
+
+    const editingId = panel === "edit" ? selected?.id : null;
+
+    if (panel === "edit" && editingId == null) return;
 
     const data = {
       title: form.title.trim(),
@@ -186,7 +296,11 @@ export default function ManageAnnouncementsPage() {
           ? await createAnnouncement(data)
           : await updateAnnouncement(editingId, data);
 
-      if (!saved?.id) {
+      if (
+        saved?.id == null ||
+        typeof saved.is_published !== "boolean" ||
+        (editingId !== null && saved.id !== editingId)
+      ) {
         throw new Error("Unexpected save response.");
       }
 
@@ -196,8 +310,6 @@ export default function ManageAnnouncementsPage() {
           : "Announcement saved as a draft.",
       );
 
-      resetForm();
-      setDeleteId(null);
       showLatestList();
     } catch (error) {
       handleMutationError(error);
@@ -208,9 +320,16 @@ export default function ManageAnnouncementsPage() {
   }
 
   async function handleDelete() {
-    if (mutationRef.current || needsCheck || deleteId === null) return;
+    if (
+      mutationRef.current ||
+      needsCheck ||
+      !confirmDelete ||
+      !selected
+    ) {
+      return;
+    }
 
-    const id = deleteId;
+    const id = selected.id;
 
     mutationRef.current = true;
     setBusy(true);
@@ -220,9 +339,6 @@ export default function ManageAnnouncementsPage() {
     try {
       await deleteAnnouncement(id);
 
-      if (editingId === id) resetForm();
-
-      setDeleteId(null);
       setSuccessMessage(`Announcement #${id} deleted.`);
       setPage(1);
       refreshList();
@@ -235,23 +351,34 @@ export default function ManageAnnouncementsPage() {
   }
 
   return (
-    <section>
-      <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-        Administration
-      </p>
+    <section className="min-w-0 space-y-5">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+            Administration
+          </p>
 
-      <h1 className="mt-2 text-3xl font-bold text-slate-900">
-        Manage announcements
-      </h1>
+          <h1 className="page-title mt-2">Manage announcements</h1>
 
-      <p className="mt-3 leading-7 text-slate-500">
-        Create hostel notices and choose when they become visible.
-      </p>
+          <p className="page-description">
+            Create notices, manage drafts and publish hostel updates.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => startCreating(event.currentTarget)}
+          disabled={loading || busy || needsCheck}
+          className="button-primary"
+        >
+          Add announcement
+        </button>
+      </header>
 
       {successMessage && (
         <p
           role="status"
-          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
         >
           {successMessage}
         </p>
@@ -260,18 +387,20 @@ export default function ManageAnnouncementsPage() {
       {actionError && (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
         >
           <p>{actionError}</p>
 
           {needsCheck && (
             <button
               type="button"
-              disabled={loading || Boolean(listError)}
+              disabled={
+                busy || loading || Boolean(listError) || !reviewReloaded
+              }
               onClick={() => {
                 setNeedsCheck(false);
                 setActionError("");
-                resetForm();
+                resetPanel();
               }}
               className="mt-3 font-semibold underline disabled:opacity-50"
             >
@@ -281,275 +410,375 @@ export default function ManageAnnouncementsPage() {
         </div>
       )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-      >
-        <h2 className="text-xl font-bold text-slate-900">
-          {editingId === null
-            ? "Create announcement"
-            : `Edit announcement #${editingId}`}
-        </h2>
-
-        <fieldset disabled={busy || needsCheck} className="mt-6 space-y-5">
-          <div>
-            <label
-              htmlFor="announcement-title"
-              className="text-sm font-semibold text-slate-700"
-            >
-              Title
-            </label>
-
-            <input
-              ref={titleRef}
-              id="announcement-title"
-              value={form.title}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  title: event.target.value,
-                }))
-              }
-              required
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="announcement-message"
-              className="text-sm font-semibold text-slate-700"
-            >
-              Message
-            </label>
-
-            <textarea
-              id="announcement-message"
-              rows={5}
-              value={form.message}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  message: event.target.value,
-                }))
-              }
-              required
-              className={inputClass}
-            />
-          </div>
-
-          <label className="flex items-start gap-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={form.is_published}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  is_published: event.target.checked,
-                }))
-              }
-              className="mt-1"
-            />
-
-            <span>
-              Publish this announcement
-              <span className="mt-1 block text-xs text-slate-500">
-                Published notices are visible to logged-in users.
-                Untick to keep it as a draft.
-              </span>
-            </span>
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="w-full sm:w-56">
+          <label
+            htmlFor="announcement-publication-filter"
+            className="form-label"
+          >
+            Publication status
           </label>
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="submit"
-              className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-            >
-              {busy ? "Please wait…" : "Save announcement"}
-            </button>
-
-            {editingId !== null && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className={secondaryButton}
-              >
-                Cancel editing
-              </button>
-            )}
-          </div>
-        </fieldset>
-      </form>
-
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-900">
-          Existing announcements
-        </h2>
-
-        <div className="flex flex-wrap gap-3">
           <select
-            aria-label="Filter announcements by publication status"
+            id="announcement-publication-filter"
             value={published}
             disabled={loading || busy}
-            onChange={(event) => {
-              setPublished(event.target.value);
-              setPage(1);
-              setDeleteId(null);
-              setLoading(true);
-            }}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm"
+            onChange={changeFilter}
+            className="form-input"
           >
             <option value="">All announcements</option>
             <option value="true">Published</option>
             <option value="false">Drafts</option>
           </select>
-
-          <button
-            type="button"
-            disabled={loading || busy}
-            onClick={refreshList}
-            className={secondaryButton}
-          >
-            Refresh
-          </button>
         </div>
+
+        <button
+          type="button"
+          disabled={loading || busy}
+          onClick={refreshList}
+          className="button-secondary"
+        >
+          Refresh
+        </button>
       </div>
 
       {loading ? (
-        <div className="mt-6">
-          <LoadingMessage label="Loading announcements…" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <LoadingMessage label="Loading announcements…" compact />
         </div>
       ) : listError ? (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-red-50 p-5 text-red-800"
+          className="rounded-xl bg-red-50 p-5 text-sm text-red-800"
         >
           <p>{listError}</p>
 
           <button
             type="button"
             onClick={refreshList}
+            disabled={busy}
             className="mt-3 font-semibold underline"
           >
             Try again
           </button>
         </div>
       ) : announcements.length === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-          No announcements match this view.
-        </p>
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+          <h2 className="text-base font-semibold text-slate-900">
+            No announcements found
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-500">
+            No announcements match the selected publication status.
+          </p>
+        </div>
       ) : (
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
-          {announcements.map((announcement) => (
-            <article
-              key={announcement.id}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[660px] table-fixed text-left text-sm">
+              <caption className="sr-only">
+                Announcement titles, publication status and update dates
+              </caption>
+
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th scope="col" className="w-[40%] px-4 py-3">
+                    Title
+                  </th>
+                  <th scope="col" className="w-[18%] px-4 py-3">
+                    Status
+                  </th>
+                  <th scope="col" className="w-[25%] px-4 py-3">
+                    Updated
+                  </th>
+                  <th scope="col" className="w-[17%] px-4 py-3">
+                    Details
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {announcements.map((announcement) => (
+                  <tr
+                    key={announcement.id}
+                    className={
+                      selected?.id === announcement.id
+                        ? "bg-blue-50/60"
+                        : "hover:bg-slate-50"
+                    }
+                  >
+                    <th
+                      scope="row"
+                      className="px-4 py-3 font-medium text-slate-900"
+                    >
+                      <p className="truncate" title={announcement.title}>
+                        {announcement.title}
+                      </p>
+
+                      <p className="mt-1 text-xs font-normal text-slate-500">
+                        Notice #{announcement.id}
+                      </p>
+                    </th>
+
+                    <td className="px-4 py-3">
+                      <PublicationBadge
+                        published={announcement.is_published}
+                      />
+                    </td>
+
+                    <td className="px-4 py-3 text-xs leading-5 text-slate-500">
+                      {formatDate(announcement.updated_at)}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={(event) =>
+                          openDetails(announcement, event.currentTarget)
+                        }
+                        aria-label={`View announcement ${announcement.id}`}
+                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        View details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <nav
+        aria-label="Admin announcement pages"
+        className="flex items-center justify-between gap-3"
+      >
+        <button
+          type="button"
+          disabled={loading || busy || page === 1}
+          onClick={() => changePage(page - 1)}
+          className="button-secondary"
+        >
+          Previous
+        </button>
+
+        <span className="text-sm text-slate-500">Page {page}</span>
+
+        <button
+          type="button"
+          disabled={loading || busy || Boolean(listError) || !hasNext}
+          onClick={() => changePage(page + 1)}
+          className="button-secondary"
+        >
+          Next
+        </button>
+      </nav>
+
+      {panel && (
+        <section
+          ref={panelRef}
+          tabIndex={-1}
+          aria-labelledby="admin-notice-panel-title"
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <h2
+              id="admin-notice-panel-title"
+              className="min-w-0 break-words font-heading text-base font-semibold text-slate-900"
             >
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  announcement.is_published
-                    ? "bg-emerald-50 text-emerald-800"
-                    : "bg-slate-100 text-slate-700"
-                }`}
+              {panel === "create"
+                ? "Create announcement"
+                : panel === "edit"
+                  ? `Edit announcement #${selected?.id}`
+                  : selected?.title}
+            </h2>
+
+            <button
+              type="button"
+              onClick={closePanel}
+              disabled={busy}
+              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Close
+            </button>
+          </div>
+
+          {panel === "create" || panel === "edit" ? (
+            <form onSubmit={handleSubmit}>
+              <fieldset
+                disabled={busy || needsCheck}
+                className="mt-5 space-y-4"
               >
-                {announcement.is_published ? "Published" : "Draft"}
-              </span>
+                <div>
+                  <label
+                    htmlFor="announcement-title"
+                    className="form-label"
+                  >
+                    Title
+                  </label>
 
-              <h3 className="mt-4 break-words text-xl font-bold text-slate-900">
-                {announcement.title}
-              </h3>
+                  <input
+                    ref={titleRef}
+                    id="announcement-title"
+                    value={form.title}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        title: event.target.value,
+                      }))
+                    }
+                    required
+                    className="form-input"
+                  />
+                </div>
 
-              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
-                {announcement.message}
+                <div>
+                  <label
+                    htmlFor="announcement-message"
+                    className="form-label"
+                  >
+                    Message
+                  </label>
+
+                  <textarea
+                    id="announcement-message"
+                    rows={5}
+                    value={form.message}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        message: event.target.value,
+                      }))
+                    }
+                    required
+                    className="form-input resize-y"
+                  />
+                </div>
+
+                <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_published}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        is_published: event.target.checked,
+                      }))
+                    }
+                    className="mt-1 size-4 accent-blue-700"
+                  />
+
+                  <span>
+                    Publish this announcement
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      Published notices are visible to logged-in users.
+                      Leave unchecked to save a draft.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="flex flex-wrap gap-3">
+                  <button type="submit" className="button-primary">
+                    {busy ? "Saving…" : "Save announcement"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (panel === "edit") {
+                        setPanel("view");
+                        setActionError("");
+                      } else {
+                        closePanel();
+                      }
+                    }}
+                    className="button-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          ) : selected ? (
+            <>
+              <div className="mt-3">
+                <PublicationBadge published={selected.is_published} />
+              </div>
+
+              <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+                <div>
+                  <dt className="text-slate-500">Created · Nairobi</dt>
+                  <dd className="mt-1 text-slate-700">
+                    {formatDate(selected.created_at)}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-slate-500">Updated · Nairobi</dt>
+                  <dd className="mt-1 text-slate-700">
+                    {formatDate(selected.updated_at)}
+                  </dd>
+                </div>
+              </dl>
+
+              <p className="mt-5 whitespace-pre-wrap break-words border-t border-slate-100 pt-5 text-sm leading-6 text-slate-600">
+                {selected.message}
               </p>
 
-              {deleteId === announcement.id ? (
-                <div className="mt-6 rounded-xl bg-red-50 p-4">
-                  <p className="text-sm text-red-900">
-                    Permanently delete this announcement? To hide it
-                    while keeping a copy, edit it and untick Publish.
+              {confirmDelete ? (
+                <div className="mt-5 rounded-xl bg-red-50 p-4">
+                  <p className="text-sm leading-6 text-red-900">
+                    Permanently delete “{selected.title}”? To keep a copy
+                    while hiding it from readers, edit it and untick Publish.
                   </p>
 
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-3 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={handleDelete}
                       disabled={busy || needsCheck}
-                      className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
                     >
                       {busy ? "Deleting…" : "Confirm delete"}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setDeleteId(null)}
+                      onClick={() => setConfirmDelete(false)}
                       disabled={busy}
-                      className={secondaryButton}
+                      className="button-secondary"
                     >
                       Keep announcement
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-wrap gap-3">
                   <button
                     type="button"
-                    onClick={() => startEditing(announcement)}
+                    onClick={startEditing}
                     disabled={busy || needsCheck}
-                    className={secondaryButton}
+                    className="button-primary"
                   >
-                    Edit
+                    Edit announcement
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setDeleteId(announcement.id)}
+                    onClick={() => setConfirmDelete(true)}
                     disabled={busy || needsCheck}
-                    className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                    className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                   >
                     Delete
                   </button>
                 </div>
               )}
-            </article>
-          ))}
-        </div>
+            </>
+          ) : null}
+        </section>
       )}
-
-      <nav
-        aria-label="Admin announcement pages"
-        className="mt-8 flex items-center justify-center gap-4"
-      >
-        <button
-          type="button"
-          disabled={loading || busy || page === 1}
-          onClick={() => {
-            setDeleteId(null);
-            setLoading(true);
-            setPage((value) => value - 1);
-          }}
-          className={secondaryButton}
-        >
-          Previous
-        </button>
-
-        <span className="text-sm text-slate-600">
-          Page {page}
-        </span>
-
-        <button
-          type="button"
-          disabled={loading || busy || Boolean(listError) || !hasNext}
-          onClick={() => {
-            setDeleteId(null);
-            setLoading(true);
-            setPage((value) => value + 1);
-          }}
-          className={secondaryButton}
-        >
-          Next
-        </button>
-      </nav>
     </section>
   );
 }
