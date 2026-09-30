@@ -4,12 +4,13 @@ import { BrowserRouter } from "react-router";
 import "./index.css";
 import App from "./App.jsx";
 import AuthProvider from "./context/AuthContext";
-
-
+import ScrollToTop from "./components/common/ScrollToTop";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
+      <ScrollToTop />
+
       <AuthProvider>
         <App />
       </AuthProvider>
