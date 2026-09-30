@@ -75,13 +75,9 @@ const container = "mx-auto w-full max-w-7xl px-5 sm:px-8";
 export default function HomePage() {
   const { user, authLoading } = useAuth();
 
-  const isManagement = Boolean(
-    user && (user.is_staff || user.is_superuser),
-  );
+  const isManagement = Boolean(user && (user.is_staff || user.is_superuser));
 
-  const accountLink = isManagement
-    ? "/staff/dashboard"
-    : "/my-applications";
+  const accountLink = isManagement ? "/staff/dashboard" : "/my-applications";
 
   return (
     <div className="min-w-0 bg-[#faf9f6] text-slate-900">
@@ -94,14 +90,18 @@ export default function HomePage() {
           src="/images/home-hero.jpg"
           alt=""
           fetchPriority="high"
-          width={1200}
-          height={900}
-          className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
+          width={736}
+          height={1349}
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_60%] sm:object-[center_65%]"
         />
 
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-black/55"
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.65) 45%, rgba(15,23,42,0.2) 100%)",
+          }}
         />
 
         <div className={`${container} py-16 sm:py-20`}>
@@ -120,8 +120,8 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-5 max-w-md text-sm leading-7 text-white/90 sm:text-base">
-              Explore your accommodation options, apply for a space
-              and keep track of your stay from one account.
+              Explore your accommodation options, apply for a space and keep
+              track of your stay from one account.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-4">
@@ -171,9 +171,9 @@ export default function HomePage() {
 
           <div className="max-w-xl">
             <p className="text-sm leading-7 text-slate-600">
-              Choosing a room is the first step. KejaSpace also helps you
-              follow your application, see your rent charges and keep up
-              with hostel notices throughout your stay.
+              Choosing a room is the first step. KejaSpace also helps you follow
+              your application, see your rent charges and keep up with hostel
+              notices throughout your stay.
             </p>
 
             <Link
@@ -232,9 +232,7 @@ export default function HomePage() {
                   {room.name}
                 </h3>
 
-                <span className="text-xs text-slate-500">
-                  {room.occupancy}
-                </span>
+                <span className="text-xs text-slate-500">{room.occupancy}</span>
               </div>
 
               <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -245,8 +243,8 @@ export default function HomePage() {
         </div>
 
         <p className="mt-5 text-xs leading-5 text-slate-500">
-          Photos illustrate room types. Check individual listings for
-          current prices and available spaces.
+          Photos illustrate room types. Check individual listings for current
+          prices and available spaces.
         </p>
       </section>
 
@@ -341,7 +339,9 @@ export default function HomePage() {
 
       {/* Simple closing invitation */}
       <section className="bg-[#eaeef2]">
-        <div className={`${container} flex flex-col items-start justify-between gap-5 py-8 sm:flex-row sm:items-center sm:py-10`}>
+        <div
+          className={`${container} flex flex-col items-start justify-between gap-5 py-8 sm:flex-row sm:items-center sm:py-10`}
+        >
           <div>
             <h2 className="font-heading text-xl font-semibold tracking-tight">
               Start with a look around.
