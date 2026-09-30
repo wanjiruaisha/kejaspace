@@ -9,7 +9,7 @@ const roomImages = {
   2: [
     "/images/rooms/twin-1.jpeg",
     "/images/rooms/twin-2.jpeg",
-    "/images/rooms/twin-3.jpeg",
+    "/images/rooms/twin-3.jpg",
   ],
 
   // Triple rooms
@@ -28,7 +28,7 @@ const roomCoverImages = {
   A101: "/images/rooms/twin-1.jpeg",
   A102: "/images/rooms/twin-1.jpeg",
   A103: "/images/rooms/twin-2.jpeg",
-  A104: "/images/rooms/twin-3.jpeg",
+  A104: "/images/rooms/twin-3.jpg",
 
   // Single: B102 and B104 share the first photo.
   // B101 keeps its existing first photo.
