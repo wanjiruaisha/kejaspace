@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { apiRequest } from "../../services/api";
 import LoadingMessage from "../../components/common/LoadingMessage";
+import { getRoomCoverImage } from "../../utils/roomImages";
 
 const statusDetails = {
   awaiting_payment: {
@@ -13,7 +14,7 @@ const statusDetails = {
   },
   reserved: {
     label: "Reserved",
-    style: "bg-blue-50 text-blue-800",
+    style: "bg-[#E8EDE4] text-[#245747]",
     message:
       "Your reservation is confirmed. Hostel staff will check you in when you arrive.",
   },
@@ -24,7 +25,7 @@ const statusDetails = {
   },
   checked_out: {
     label: "Checked out",
-    style: "bg-slate-100 text-slate-700",
+    style: "bg-stone-100 text-stone-700",
     message: "This stay has ended. It remains here for your records.",
   },
   cancelled: {
@@ -34,13 +35,28 @@ const statusDetails = {
   },
   expired: {
     label: "Expired",
-    style: "bg-slate-100 text-slate-700",
+    style: "bg-stone-100 text-stone-700",
     message: "The payment window for this stay expired.",
   },
 };
 
+const outlineButton =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "border border-[#245747]/20 bg-white px-4 py-2 text-sm " +
+  "font-semibold text-[#245747] transition-colors hover:bg-[#E8EDE4] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-40";
+
+const primaryButton =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "bg-[#245747] px-4 py-2.5 text-sm font-semibold text-white " +
+  "transition-colors hover:bg-[#173F35] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-4 " +
+  "focus-visible:outline-[#245747]";
+
 function formatDateTime(value) {
-  if (!value) return "Not yet";
+  if (!value) return "Not recorded";
 
   const date = new Date(value);
 
@@ -53,6 +69,193 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function StayPhoto({ stay }) {
+  // The stay response includes room_number.
+  // The utility uses that to find the assigned cover photo.
+  const image = getRoomCoverImage({
+    room_number: stay.room_number,
+  });
+
+  const [failedSource, setFailedSource] = useState(null);
+  const showPhoto = Boolean(image) && failedSource !== image;
+
+  return (
+    <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4] sm:w-32">
+      {showPhoto ? (
+        <>
+          <img
+            src={image}
+            alt={`Illustrative photo for room ${stay.room_number}`}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedSource(image)}
+            className="h-full w-full object-cover"
+          />
+
+          <span className="absolute bottom-1 right-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">
+            Illustrative
+          </span>
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center p-2 text-center">
+          <span className="break-words text-sm font-bold text-[#245747]">
+            {stay.room_number}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StayCard({ stay, now }) {
+  const details = statusDetails[stay.status] || {
+    label: stay.status || "Unknown",
+    style: "bg-stone-100 text-stone-700",
+    message: "Refresh the page to check your current stay status.",
+  };
+
+  const awaitingPayment = stay.status === "awaiting_payment";
+
+  const deadlineTime = stay.payment_deadline
+    ? new Date(stay.payment_deadline).getTime()
+    : NaN;
+
+  const validDeadline = Number.isFinite(deadlineTime);
+  const deadlinePassed =
+    awaitingPayment && validDeadline && deadlineTime <= now;
+
+  const missingDeadline = awaitingPayment && !validDeadline;
+
+  const message = deadlinePassed
+    ? "The displayed payment deadline has passed. Refresh to check the latest status before attempting payment."
+    : missingDeadline
+      ? "A valid payment deadline is not available. Contact hostel staff before attempting payment."
+      : details.message;
+
+  const showChargeLink = [
+    "awaiting_payment",
+    "reserved",
+    "checked_in",
+    "checked_out",
+  ].includes(stay.status);
+
+  return (
+    <article className="min-w-0 rounded-2xl border border-[#245747]/15 bg-white p-4 sm:p-5">
+      {/* Room summary */}
+      <div className="flex flex-wrap items-center gap-4">
+        <StayPhoto stay={stay} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-[#78716C]">
+            Stay #{stay.id}
+          </p>
+
+          <h2 className="mt-1 break-words font-heading text-lg font-bold text-[#173F35]">
+            Room {stay.room_number}
+          </h2>
+
+          <span
+            className={`mt-2 inline-flex rounded-full px-2.5 py-1
+              text-xs font-semibold ${details.style}`}
+          >
+            {details.label}
+          </span>
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-[#57534E]">
+        {message}
+      </p>
+
+      {/* Keep the deadline visible */}
+      {awaitingPayment && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+          <p className="text-xs font-semibold text-amber-900">
+            {deadlinePassed ? "Displayed deadline has passed" : "Payment deadline"}
+          </p>
+
+          <p className="mt-1 text-sm font-semibold text-amber-900">
+            {validDeadline
+              ? `${formatDateTime(stay.payment_deadline)} EAT`
+              : "Contact hostel staff"}
+          </p>
+        </div>
+      )}
+
+      {/* Links depend on the recorded stay status */}
+      {(showChargeLink || stay.status === "checked_in") && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {showChargeLink && (
+            <Link to="/my-charges" className={outlineButton}>
+              View rent charges
+            </Link>
+          )}
+
+          {stay.status === "checked_in" && (
+            <>
+              <Link to="/my-maintenance" className={outlineButton}>
+                Maintenance
+              </Link>
+
+              <Link to="/my-visitors" className={outlineButton}>
+                My visitors
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Secondary information stays collapsed */}
+      <details className="mt-4 border-t border-[#245747]/10 pt-2">
+        <summary
+          className="w-fit cursor-pointer rounded-lg py-2
+            text-xs font-semibold text-[#245747]
+            focus-visible:outline-2 focus-visible:outline-offset-2
+            focus-visible:outline-[#245747]"
+        >
+          Stay records
+        </summary>
+
+        <dl className="mt-2 grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-[#78716C]">
+              Application number
+            </dt>
+            <dd className="mt-1 font-medium text-[#173F35]">
+              {stay.application ? `#${stay.application}` : "Not recorded"}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-xs text-[#78716C]">Stay number</dt>
+            <dd className="mt-1 font-medium text-[#173F35]">
+              #{stay.id}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-xs text-[#78716C]">Checked in</dt>
+            <dd className="mt-1 font-medium text-[#173F35]">
+              {formatDateTime(stay.check_in_at)}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-xs text-[#78716C]">Checked out</dt>
+            <dd className="mt-1 font-medium text-[#173F35]">
+              {formatDateTime(stay.check_out_at)}
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-xs leading-5 text-[#78716C]">
+          Dates and times are shown in East Africa Time.
+        </p>
+      </details>
+    </article>
+  );
+}
+
 export default function MyStayPage() {
   const [stays, setStays] = useState([]);
   const [page, setPage] = useState(1);
@@ -61,6 +264,17 @@ export default function MyStayPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Recheck displayed deadlines while the page is open.
+  // This does not change the status stored by the backend.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -82,6 +296,7 @@ export default function MyStayPage() {
         if (!controller.signal.aborted) {
           setStays(data.results);
           setHasNext(Boolean(data.next));
+          setNow(Date.now());
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -104,29 +319,33 @@ export default function MyStayPage() {
   }, [page, retry]);
 
   function refreshStays() {
+    if (loading) return;
+
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
   function changePage(nextPage) {
+    if (loading) return;
+
     setLoading(true);
     setPage(nextPage);
   }
 
   return (
-    <section>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="mx-auto w-full min-w-0 max-w-4xl">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
             Your accommodation
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+          <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
             My stay
           </h1>
 
-          <p className="mt-3 max-w-xl text-slate-500">
-            View your room allocation, reservation status and stay history.
+          <p className="mt-2 max-w-lg text-sm leading-6 text-[#57534E]">
+            Your allocated room, reservation status and stay history.
           </p>
         </div>
 
@@ -134,161 +353,72 @@ export default function MyStayPage() {
           type="button"
           onClick={refreshStays}
           disabled={loading}
-          className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className={outlineButton}
         >
-          {loading ? "Refreshing…" : "Refresh"}
+          {loading ? "Loading…" : "Refresh"}
         </button>
-      </div>
+      </header>
 
       {loading ? (
-        <div className="mt-8">
+        <div className="mt-5">
           <LoadingMessage label="Loading your stays…" />
         </div>
       ) : error ? (
         <div
           role="alert"
-          className="mt-8 rounded-2xl bg-red-50 p-6 text-red-800"
+          className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800"
         >
           <p>{error}</p>
 
           <button
             type="button"
             onClick={refreshStays}
-            className="mt-4 font-semibold underline"
+            className="mt-2 min-h-11 font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : stays.length === 0 ? (
-        <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <h2 className="text-xl font-bold text-slate-900">
-            No stay yet
+        <div className="mt-5 rounded-2xl border border-dashed border-[#245747]/25 bg-[#FAF7F2] px-5 py-9 text-center">
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
+            No stays to show
           </h2>
 
-          <p className="mx-auto mt-3 max-w-md leading-7 text-slate-500">
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#57534E]">
             Your stay will appear here after hostel staff approve your
             accommodation application.
           </p>
 
           <Link
             to="/my-applications"
-            className="mt-6 inline-flex rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+            className={`mt-5 ${primaryButton}`}
           >
             View my applications
+            <span aria-hidden="true">→</span>
           </Link>
         </div>
       ) : (
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          {stays.map((stay) => {
-            const details = statusDetails[stay.status] || {
-              label: stay.status,
-              style: "bg-slate-100 text-slate-700",
-              message: "Refresh this page to check your current stay status.",
-            };
-
-            const deadlinePassed =
-              stay.status === "awaiting_payment" &&
-              stay.payment_deadline &&
-              new Date(stay.payment_deadline).getTime() <= Date.now();
-
-            return (
-              <article
-                key={stay.id}
-                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
-              >
-                <div className="bg-slate-900 px-6 py-6 text-white">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-blue-200">
-                    Assigned room
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-2xl font-bold">
-                      Room {stay.room_number}
-                    </h2>
-
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${details.style}`}
-                    >
-                      {details.label}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <p className="text-sm leading-7 text-slate-600">
-                    {deadlinePassed
-                      ? "The displayed payment deadline has passed. Refresh to check the latest status before attempting payment."
-                      : details.message}
-                  </p>
-
-                  <dl className="mt-6 space-y-4 text-sm">
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">Stay number</dt>
-                      <dd className="font-semibold text-slate-900">
-                        #{stay.id}
-                      </dd>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">
-                        Application number
-                      </dt>
-                      <dd className="font-semibold text-slate-900">
-                        #{stay.application}
-                      </dd>
-                    </div>
-
-                    {stay.status === "awaiting_payment" &&
-                      stay.payment_deadline && (
-                        <div className="flex justify-between gap-4">
-                          <dt className="text-slate-500">
-                            Payment deadline
-                          </dt>
-                          <dd className="text-right font-semibold text-amber-800">
-                            {formatDateTime(stay.payment_deadline)}
-                          </dd>
-                        </div>
-                      )}
-
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">Checked in</dt>
-                      <dd className="text-right font-medium text-slate-900">
-                        {formatDateTime(stay.check_in_at)}
-                      </dd>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">Checked out</dt>
-                      <dd className="text-right font-medium text-slate-900">
-                        {formatDateTime(stay.check_out_at)}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <p className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500">
-                    Dates and times are shown in East Africa Time.
-                  </p>
-                </div>
-              </article>
-            );
-          })}
+        <div className="mt-5 space-y-4">
+          {stays.map((stay) => (
+            <StayCard key={stay.id} stay={stay} now={now} />
+          ))}
         </div>
       )}
 
       <nav
         aria-label="Stay pages"
-        className="mt-8 flex items-center justify-center gap-4"
+        className="mt-6 flex flex-wrap items-center justify-center gap-3"
       >
         <button
           type="button"
           disabled={loading || page === 1}
           onClick={() => changePage(page - 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
+          className={outlineButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-600">
+        <span aria-current="page" className="text-sm text-[#57534E]">
           Page {page}
         </span>
 
@@ -296,7 +426,7 @@ export default function MyStayPage() {
           type="button"
           disabled={loading || Boolean(error) || !hasNext}
           onClick={() => changePage(page + 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
+          className={outlineButton}
         >
           Next
         </button>

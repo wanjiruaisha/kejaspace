@@ -21,6 +21,21 @@ const statusDetails = {
   },
 };
 
+const inputStyle =
+  "mt-2 min-h-11 w-full min-w-0 rounded-xl border border-[#245747]/20 " +
+  "bg-white px-3 py-2.5 text-sm text-[#173F35] " +
+  "placeholder:text-[#78716C] focus-visible:outline-2 " +
+  "focus-visible:outline-offset-2 focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+const outlineButton =
+  "inline-flex min-h-11 items-center justify-center rounded-xl " +
+  "border border-[#245747]/20 bg-white px-4 py-2 text-sm " +
+  "font-semibold text-[#245747] transition-colors hover:bg-[#E8EDE4] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-40";
+
 function formatDate(value) {
   if (!value) return "Unavailable";
 
@@ -40,16 +55,26 @@ function getErrorMessage(error) {
     return error.data.detail;
   }
 
-  if (error.data && typeof error.data === "object") {
-    return Object.entries(error.data)
+  if (
+    error.data &&
+    typeof error.data === "object" &&
+    !Array.isArray(error.data)
+  ) {
+    const message = Object.entries(error.data)
       .map(([field, messages]) => {
         const text = Array.isArray(messages)
           ? messages.join(" ")
           : String(messages);
 
-        return `${field}: ${text}`;
+        if (field === "detail" || field === "non_field_errors") {
+          return text;
+        }
+
+        return `${field.replaceAll("_", " ")}: ${text}`;
       })
       .join(" ");
+
+    if (message) return message;
   }
 
   return error.message || "The request could not be completed.";
@@ -124,6 +149,8 @@ export default function MyMaintenancePage() {
   }
 
   function changePage(nextPage) {
+    if (loading || submittingRef.current) return;
+
     setLoading(true);
     setPage(nextPage);
   }
@@ -160,7 +187,6 @@ export default function MyMaintenancePage() {
         `Maintenance request #${created.id} submitted successfully.`,
       );
 
-      // Show the newest requests, without a status filter.
       setStatus("");
       setPage(1);
       refreshList();
@@ -175,7 +201,7 @@ export default function MyMaintenancePage() {
         setNeedsReview(true);
         setFormError(
           "We could not confirm whether your request was saved. " +
-            "Check the latest requests below before submitting again.",
+            "Check the latest requests before submitting again.",
         );
 
         setStatus("");
@@ -189,265 +215,338 @@ export default function MyMaintenancePage() {
   }
 
   return (
-    <section>
-      <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-        Resident support
-      </p>
+    <section className="mx-auto w-full min-w-0 max-w-5xl">
+      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+          Resident support
+        </p>
 
-      <h1 className="mt-2 text-3xl font-bold text-slate-900">
-        Maintenance
-      </h1>
+        <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+          Something needs fixing?
+        </h1>
 
-      <p className="mt-3 max-w-2xl leading-7 text-slate-500">
-        Report a problem in your room and follow updates from hostel staff.
-        You must be checked in to submit a request.
-      </p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
+          Report a problem in your room and follow updates from hostel staff.
+        </p>
+      </header>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-      >
-        <h2 className="text-xl font-bold text-slate-900">
-          Report a problem
-        </h2>
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+        {/* Report form */}
+        <form
+          onSubmit={handleSubmit}
+          aria-busy={submitting}
+          aria-describedby={formError ? "maintenance-form-error" : undefined}
+          className="min-w-0 rounded-2xl border border-[#245747]/15 bg-white p-4 sm:p-5"
+        >
+          <h2 className="font-heading text-base font-bold text-[#173F35]">
+            Report a problem
+          </h2>
 
-        {successMessage && (
-          <p
-            role="status"
-            className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
-          >
-            {successMessage}
+          <p className="mt-2 text-xs leading-6 text-[#57534E]">
+            You must have a checked-in stay to submit a request.
+            Your room is linked automatically.
           </p>
-        )}
 
-        {formError && (
-          <p
-            role="alert"
-            className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"
-          >
-            {formError}
-          </p>
-        )}
+          {successMessage && (
+            <p
+              role="status"
+              className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-800"
+            >
+              {successMessage}
+            </p>
+          )}
 
-        <div className="mt-6">
-          <label
-            htmlFor="maintenance-title"
-            className="block text-sm font-semibold text-slate-700"
-          >
-            Title
-          </label>
+          {formError && (
+            <p
+              id="maintenance-form-error"
+              role="alert"
+              className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm leading-6 text-red-800"
+            >
+              {formError}
+            </p>
+          )}
 
-          <input
-            id="maintenance-title"
-            type="text"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="For example: Leaking bathroom tap"
-            required
-            disabled={submitting || needsReview}
-            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm disabled:opacity-60"
-          />
-        </div>
+          <div className="mt-4">
+            <label
+              htmlFor="maintenance-title"
+              className="block text-sm font-semibold text-[#173F35]"
+            >
+              Title
+            </label>
 
-        <div className="mt-5">
-          <label
-            htmlFor="maintenance-description"
-            className="block text-sm font-semibold text-slate-700"
-          >
-            Describe the problem
-          </label>
-
-          <textarea
-            id="maintenance-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Tell us what is wrong and where it is happening."
-            rows={4}
-            required
-            disabled={submitting || needsReview}
-            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm disabled:opacity-60"
-          />
-        </div>
-
-        {needsReview && (
-          <label className="mt-5 flex items-start gap-3 text-sm text-slate-700">
             <input
-              type="checkbox"
-              checked={false}
-              disabled={loading || Boolean(listError)}
-              onChange={() => {
-                setNeedsReview(false);
-                setFormError("");
-              }}
-              className="mt-1"
+              id="maintenance-title"
+              name="title"
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="For example: Leaking bathroom tap"
+              required
+              disabled={submitting || needsReview}
+              className={inputStyle}
             />
+          </div>
 
-            <span>
-              I have checked the latest requests below and confirmed
-              this request was not saved.
-            </span>
-          </label>
-        )}
+          <div className="mt-4">
+            <label
+              htmlFor="maintenance-description"
+              className="block text-sm font-semibold text-[#173F35]"
+            >
+              Describe the problem
+            </label>
 
-        <button
-          type="submit"
-          disabled={submitting || needsReview}
-          className="mt-6 rounded-xl bg-blue-700 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-        >
-          {submitting ? "Submitting…" : "Submit request"}
-        </button>
-      </form>
+            <textarea
+              id="maintenance-description"
+              name="description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What is wrong, and where is it happening?"
+              rows={4}
+              required
+              disabled={submitting || needsReview}
+              className={`${inputStyle} resize-y leading-6`}
+            />
+          </div>
 
-      <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-900">
-          My requests
-        </h2>
+          {needsReview && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs leading-6 text-amber-900">
+                Review the request list first. If your request appears,
+                don’t submit it again.
+              </p>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <label htmlFor="maintenance-status" className="sr-only">
-            Filter by status
-          </label>
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm leading-6 text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  disabled={loading || submitting || Boolean(listError)}
+                  onChange={(event) => {
+                    if (!event.target.checked) return;
 
-          <select
-            id="maintenance-status"
-            value={status}
-            disabled={loading || submitting}
-            onChange={(event) => {
-              setLoading(true);
-              setStatus(event.target.value);
-              setPage(1);
-            }}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm"
-          >
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="in_progress">In progress</option>
-            <option value="resolved">Resolved</option>
-          </select>
+                    setNeedsReview(false);
+                    setFormError("");
+                  }}
+                  className="mt-1 size-4 shrink-0 accent-[#245747]"
+                />
 
-          <button
-            type="button"
-            onClick={refreshList}
-            disabled={loading || submitting}
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="mt-6">
-          <LoadingMessage label="Loading maintenance requests…" />
-        </div>
-      ) : listError ? (
-        <div
-          role="alert"
-          className="mt-6 rounded-2xl bg-red-50 p-6 text-red-800"
-        >
-          <p>{listError}</p>
+                <span>
+                  I checked the latest requests and confirmed this
+                  request was not saved.
+                </span>
+              </label>
+            </div>
+          )}
 
           <button
-            type="button"
-            onClick={refreshList}
-            className="mt-3 font-semibold underline"
+            type="submit"
+            disabled={submitting || needsReview}
+            className="mt-5 inline-flex min-h-11 w-full items-center
+              justify-center gap-2 rounded-xl bg-[#245747]
+              px-4 py-3 text-sm font-semibold text-white
+              transition-colors hover:bg-[#173F35]
+              focus-visible:outline-2 focus-visible:outline-offset-4
+              focus-visible:outline-[#245747]
+              disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Try again
+            {submitting ? "Submitting…" : "Submit request"}
+            {!submitting && <span aria-hidden="true">→</span>}
           </button>
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-          {status
-            ? "No requests match this status."
-            : "You haven’t submitted any maintenance requests yet."}
-        </div>
-      ) : (
-        <div className="mt-6 grid gap-5 lg:grid-cols-2">
-          {requests.map((request) => {
-            const details = statusDetails[request.status] || {
-              label: request.status,
-              classes: "bg-slate-100 text-slate-700",
-            };
+        </form>
 
-            return (
-              <article
-                key={request.id}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        {/* Request list */}
+        <section aria-labelledby="requests-heading" className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2
+              id="requests-heading"
+              className="font-heading text-base font-bold text-[#173F35]"
+            >
+              My requests
+            </h2>
+
+            <button
+              type="button"
+              onClick={refreshList}
+              disabled={loading || submitting}
+              className={outlineButton}
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="mt-3">
+            <label
+              htmlFor="maintenance-status"
+              className="block text-xs font-semibold text-[#57534E]"
+            >
+              Filter by status
+            </label>
+
+            <select
+              id="maintenance-status"
+              value={status}
+              disabled={loading || submitting}
+              onChange={(event) => {
+                setLoading(true);
+                setStatus(event.target.value);
+                setPage(1);
+              }}
+              className={`${inputStyle} sm:max-w-56`}
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In progress</option>
+              <option value="resolved">Resolved</option>
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="mt-5">
+              <LoadingMessage label="Loading maintenance requests…" />
+            </div>
+          ) : listError ? (
+            <div
+              role="alert"
+              className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800"
+            >
+              <p>{listError}</p>
+
+              <button
+                type="button"
+                onClick={refreshList}
+                disabled={submitting}
+                className="mt-2 min-h-11 font-semibold underline
+                  underline-offset-4 disabled:opacity-50"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-slate-500">
-                    #{request.id} · Room {request.room_number}
-                  </p>
+                Try again
+              </button>
+            </div>
+          ) : requests.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-[#245747]/25 bg-[#FAF7F2] px-4 py-8 text-center">
+              <h3 className="text-sm font-semibold text-[#173F35]">
+                {status ? "No matching requests" : "No requests yet"}
+              </h3>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${details.classes}`}
+              <p className="mt-2 text-sm leading-6 text-[#57534E]">
+                {status
+                  ? "Choose another status to see more requests."
+                  : "Requests you submit will appear here with updates from staff."}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {requests.map((request) => {
+                const details = statusDetails[request.status] || {
+                  label: request.status || "Unknown",
+                  classes: "bg-stone-100 text-stone-700",
+                };
+
+                return (
+                  <article
+                    key={request.id}
+                    className="min-w-0 rounded-2xl border
+                      border-[#245747]/15 bg-white p-4
+                      transition-colors hover:border-[#245747]/35"
                   >
-                    {details.label}
-                  </span>
-                </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-[#78716C]">
+                        #{request.id} · Room {request.room_number}
+                      </p>
 
-                <h3 className="mt-4 break-words text-xl font-bold text-slate-900">
-                  {request.title}
-                </h3>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs
+                          font-semibold ${details.classes}`}
+                      >
+                        {details.label}
+                      </span>
+                    </div>
 
-                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
-                  {request.description}
-                </p>
+                    <h3 className="mt-3 break-words font-heading text-sm font-bold text-[#173F35]">
+                      {request.title}
+                    </h3>
 
-                {request.staff_note && (
-                  <div className="mt-5 rounded-xl bg-blue-50 p-4">
-                    <p className="text-sm font-semibold text-blue-900">
-                      Update from staff
+                    <p className="mt-2 text-xs leading-5 text-[#78716C]">
+                      Submitted: {formatDate(request.created_at)}
                     </p>
 
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-blue-800">
-                      {request.staff_note}
-                    </p>
-                  </div>
-                )}
+                    <details className="mt-3 border-t border-[#245747]/10 pt-1">
+                      <summary
+                        className="w-fit cursor-pointer rounded-lg
+                          py-2 text-xs font-semibold text-[#245747]
+                          focus-visible:outline-2
+                          focus-visible:outline-offset-2
+                          focus-visible:outline-[#245747]"
+                      >
+                        {request.staff_note
+                          ? "Details and staff update"
+                          : "View details"}
+                      </summary>
 
-                <div className="mt-5 space-y-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
-                  <p>
-                    Submitted: {formatDate(request.created_at)}
-                  </p>
-                  <p>
-                    Updated: {formatDate(request.updated_at)}
-                  </p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                      <div className="pt-2">
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#57534E]">
+                          {request.description}
+                        </p>
 
-      <nav
-        aria-label="Maintenance pages"
-        className="mt-8 flex items-center justify-center gap-4"
-      >
-        <button
-          type="button"
-          disabled={loading || submitting || page === 1}
-          onClick={() => changePage(page - 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-        >
-          Previous
-        </button>
+                        {request.staff_note ? (
+                          <div className="mt-3 rounded-xl bg-[#E8EDE4] p-3">
+                            <h4 className="text-xs font-semibold text-[#173F35]">
+                              Update from staff
+                            </h4>
 
-        <span className="text-sm text-slate-600">
-          Page {page}
-        </span>
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[#245747]">
+                              {request.staff_note}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs leading-5 text-[#78716C]">
+                            No staff note has been added yet.
+                          </p>
+                        )}
 
-        <button
-          type="button"
-          disabled={
-            loading || submitting || Boolean(listError) || !hasNext
-          }
-          onClick={() => changePage(page + 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-        >
-          Next
-        </button>
-      </nav>
+                        <p className="mt-3 text-xs leading-5 text-[#78716C]">
+                          Updated: {formatDate(request.updated_at)}
+                        </p>
+                      </div>
+                    </details>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          <nav
+            aria-label="Maintenance pages"
+            className="mt-5 flex flex-wrap items-center justify-center gap-3"
+          >
+            <button
+              type="button"
+              disabled={loading || submitting || page === 1}
+              onClick={() => changePage(page - 1)}
+              className={outlineButton}
+            >
+              Previous
+            </button>
+
+            <span aria-current="page" className="text-sm text-[#57534E]">
+              Page {page}
+            </span>
+
+            <button
+              type="button"
+              disabled={
+                loading || submitting || Boolean(listError) || !hasNext
+              }
+              onClick={() => changePage(page + 1)}
+              className={outlineButton}
+            >
+              Next
+            </button>
+          </nav>
+
+          <p className="mt-3 text-center text-xs leading-5 text-[#78716C]">
+            Dates and times are shown in East Africa Time.
+          </p>
+        </section>
+      </div>
     </section>
   );
 }
