@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { apiRequest } from "../../services/api";
@@ -8,8 +8,34 @@ const statusStyles = {
   pending: "bg-amber-50 text-amber-800",
   approved: "bg-emerald-50 text-emerald-800",
   rejected: "bg-red-50 text-red-800",
-  cancelled: "bg-slate-100 text-slate-600",
+  cancelled: "bg-stone-100 text-stone-600",
 };
+
+const statusDescriptions = {
+  pending:
+    "Your application is waiting for staff review. Submitting an application does not reserve a space.",
+  approved:
+    "Your application was approved. Check My stay and My charges for your current reservation, payment status and any payment deadline.",
+  rejected:
+    "This application was not approved. You can browse other rooms or contact hostel staff for clarification.",
+  cancelled:
+    "This application has been cancelled and is no longer available for staff approval.",
+};
+
+const outlineButton =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "border border-[#245747]/20 bg-white px-4 py-2 text-sm " +
+  "font-semibold text-[#245747] transition-colors hover:bg-[#E8EDE4] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-40";
+
+const primaryButton =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "bg-[#245747] px-4 py-2.5 text-sm font-semibold text-white " +
+  "transition-colors hover:bg-[#173F35] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-4 " +
+  "focus-visible:outline-[#245747]";
 
 export default function MyApplicationsPage() {
   const [applications, setApplications] = useState([]);
@@ -25,7 +51,8 @@ export default function MyApplicationsPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
-  // Load the signed-in resident's applications.
+  const cancellationRef = useRef(false);
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -36,18 +63,20 @@ export default function MyApplicationsPage() {
       try {
         const data = await apiRequest(
           `/applications/?page=${page}&page_size=6`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
 
         if (!Array.isArray(data?.results)) {
           throw new Error(
-            "The server returned an unexpected application list."
+            "The server returned an unexpected application list.",
           );
         }
 
         if (!controller.signal.aborted) {
           setApplications(data.results);
           setHasNext(Boolean(data.next));
+
+          // Unlock cancellation only after a successful refresh.
           setNeedsRefresh(false);
         }
       } catch (err) {
@@ -55,7 +84,7 @@ export default function MyApplicationsPage() {
           setError(
             err instanceof TypeError
               ? "Could not connect. Please check your connection and try again."
-              : err.message
+              : err.message || "Could not load your applications.",
           );
         }
       } finally {
@@ -70,10 +99,17 @@ export default function MyApplicationsPage() {
     return () => controller.abort();
   }, [page, retry]);
 
-  // Cancel only after the resident confirms.
   async function handleCancel(applicationId) {
-    if (cancellingId !== null || needsRefresh || loading) return;
+    if (
+      cancellationRef.current ||
+      needsRefresh ||
+      loading ||
+      confirmingId !== applicationId
+    ) {
+      return;
+    }
 
+    cancellationRef.current = true;
     setActionError("");
     setActionMessage("");
     setCancellingId(applicationId);
@@ -91,37 +127,47 @@ export default function MyApplicationsPage() {
       setApplications((previous) =>
         previous.map((application) =>
           application.id === applicationId
-            ? updatedApplication
-            : application
-        )
+            ? { ...application, ...updatedApplication }
+            : application,
+        ),
       );
 
       setConfirmingId(null);
-      setActionMessage("Your application has been cancelled.");
+      setActionMessage(
+        `Application #${applicationId} has been cancelled.`,
+      );
     } catch (err) {
       setConfirmingId(null);
 
       if (err.status === 400 || err.status === 404) {
-        setActionError(err.message);
+        setActionError(
+          err.message ||
+            "This application may have changed. Refresh the list.",
+        );
         setNeedsRefresh(true);
       } else if (err.status === 401 || err.status === 403) {
-        setActionError(err.message);
+        setActionError(
+          err.message || "You don’t have permission to cancel this application.",
+        );
       } else if (err.status === 429) {
         setActionError(
-          "Too many requests. Please wait before trying again."
+          "Too many requests. Please wait before trying again.",
         );
       } else {
         setActionError(
-          "We couldn’t confirm the cancellation. Refresh the list to check its current status before trying again."
+          "We couldn’t confirm the cancellation. Refresh the list to check its current status before trying again.",
         );
         setNeedsRefresh(true);
       }
     } finally {
+      cancellationRef.current = false;
       setCancellingId(null);
     }
   }
 
   function refreshApplications() {
+    if (cancellationRef.current || loading) return;
+
     setConfirmingId(null);
     setActionError("");
     setActionMessage("");
@@ -130,6 +176,8 @@ export default function MyApplicationsPage() {
   }
 
   function changePage(nextPage) {
+    if (cancellationRef.current || loading || needsRefresh) return;
+
     setConfirmingId(null);
     setActionError("");
     setActionMessage("");
@@ -137,35 +185,36 @@ export default function MyApplicationsPage() {
     setPage(nextPage);
   }
 
+  const busy = loading || cancellingId !== null;
+
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section className="mx-auto w-full min-w-0 max-w-5xl">
+      {/* Compact page header */}
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
             Your accommodation
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+          <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
             My applications
           </h1>
 
-          <p className="mt-3 text-slate-500">
-            Follow the progress of your room applications.
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            Follow your requests and see what happens next.
           </p>
         </div>
 
-        <Link
-          to="/rooms"
-          className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800"
-        >
+        <Link to="/rooms" className={primaryButton}>
           Browse rooms
+          <span aria-hidden="true">↗</span>
         </Link>
-      </div>
+      </header>
 
       {actionMessage && (
         <p
           role="status"
-          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-800"
         >
           {actionMessage}
         </p>
@@ -174,7 +223,7 @@ export default function MyApplicationsPage() {
       {actionError && (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -182,8 +231,8 @@ export default function MyApplicationsPage() {
             <button
               type="button"
               onClick={refreshApplications}
-              disabled={loading || cancellingId !== null}
-              className="mt-3 font-semibold underline disabled:opacity-50"
+              disabled={busy}
+              className="mt-2 min-h-11 font-semibold underline underline-offset-4 disabled:opacity-50"
             >
               Refresh applications
             </button>
@@ -191,139 +240,193 @@ export default function MyApplicationsPage() {
         </div>
       )}
 
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <h2 className="font-heading text-base font-semibold text-[#173F35]">
+          Your requests
+        </h2>
+
+        <button
+          type="button"
+          onClick={refreshApplications}
+          disabled={busy}
+          className="min-h-11 rounded-lg px-3 text-sm font-semibold
+            text-[#245747] underline-offset-4 hover:underline
+            disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Refresh
+        </button>
+      </div>
+
       {loading ? (
-        <p role="status" className="mt-8 text-slate-600">
+        <p role="status" className="mt-4 py-6 text-sm text-[#57534E]">
           Loading your applications…
         </p>
       ) : error ? (
         <div
           role="alert"
-          className="mt-8 rounded-2xl bg-red-50 p-6 text-red-800"
+          className="mt-3 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800"
         >
           <p>{error}</p>
 
           <button
             type="button"
             onClick={refreshApplications}
-            className="mt-4 font-semibold underline"
+            className="mt-2 min-h-11 font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : applications.length === 0 ? (
-        <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <h2 className="text-xl font-bold text-slate-900">
-            No applications yet
-          </h2>
+        <div className="mt-3 rounded-2xl border border-dashed border-[#245747]/25 bg-[#FAF7F2] px-5 py-9 text-center">
+          <h3 className="font-heading text-base font-semibold text-[#173F35]">
+            No applications to show
+          </h3>
 
-          <p className="mt-3 text-slate-500">
-            Start by exploring rooms to find a space that suits you.
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            Explore the rooms and find a space that suits you.
           </p>
+
+          <Link to="/rooms" className={`mt-4 ${primaryButton}`}>
+            Explore rooms
+          </Link>
         </div>
       ) : (
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
+        <div className="mt-3 space-y-3">
           {applications.map((application) => (
             <article
               key={application.id}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              className="min-w-0 rounded-2xl border border-[#245747]/15
+                bg-white p-4 transition-colors
+                hover:border-[#245747]/35 sm:p-5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Room {application.room_number}
-                </h2>
+              {/* Always-visible summary */}
+              <div className="grid items-center gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                <div className="min-w-0">
+                  <p className="text-xs text-[#78716C]">
+                    Application #{application.id}
+                  </p>
+
+                  <h3 className="mt-1 break-words font-heading text-base font-bold text-[#173F35]">
+                    Room {application.room_number}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-xs text-[#78716C]">
+                    Requested move-in
+                  </p>
+
+                  <p className="mt-1 text-sm font-medium text-[#173F35]">
+                    {application.move_in_date || "Not provided"}
+                  </p>
+                </div>
 
                 <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-                    statusStyles[application.status] ||
-                    "bg-slate-100 text-slate-600"
-                  }`}
+                  className={`justify-self-start rounded-full px-3 py-1.5
+                    text-xs font-semibold capitalize sm:justify-self-end ${
+                      statusStyles[application.status] ||
+                      "bg-stone-100 text-stone-600"
+                    }`}
                 >
                   {application.status}
                 </span>
               </div>
 
-              <dl className="mt-5 space-y-3 text-sm">
-                <div className="flex flex-wrap justify-between gap-3">
-                  <dt className="text-slate-500">Application number</dt>
-                  <dd className="font-medium">#{application.id}</dd>
-                </div>
+              {/* Native expandable details */}
+              <details className="mt-3 border-t border-[#245747]/10 pt-2">
+                <summary
+                  className="w-fit cursor-pointer rounded-lg py-2
+                    text-xs font-semibold text-[#245747]
+                    focus-visible:outline-2 focus-visible:outline-offset-2
+                    focus-visible:outline-[#245747]"
+                >
+                  Details and actions
+                </summary>
 
-                <div className="flex flex-wrap justify-between gap-3">
-                  <dt className="text-slate-500">
-                    Requested move-in date
-                  </dt>
-                  <dd className="font-medium">
-                    {application.move_in_date}
-                  </dd>
-                </div>
-              </dl>
+                <div className="pt-2">
+                  <p className="max-w-2xl text-sm leading-6 text-[#57534E]">
+                    {statusDescriptions[application.status] ||
+                      "Check with hostel staff for more information about this application."}
+                  </p>
 
-              {application.status === "approved" && (
-                <p className="mt-5 rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                  Your application was approved. Approval alone does not
-                  confirm a reservation—check your stay and rent charge
-                  for the current payment and reservation status.
-                </p>
-              )}
+                  {application.status === "approved" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link to="/my-stay" className={outlineButton}>
+                        My stay
+                      </Link>
 
-              {application.status === "pending" && (
-                <div className="mt-6 border-t border-slate-100 pt-5">
-                  {confirmingId === application.id ? (
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">
-                        Cancel this application?
-                      </p>
-
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        It will no longer be available for staff approval.
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingId(null)}
-                          disabled={cancellingId !== null}
-                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                        >
-                          Keep application
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleCancel(application.id)}
-                          disabled={
-                            loading ||
-                            cancellingId !== null ||
-                            needsRefresh
-                          }
-                          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
-                        >
-                          {cancellingId === application.id
-                            ? "Cancelling…"
-                            : "Yes, cancel"}
-                        </button>
-                      </div>
+                      <Link to="/my-charges" className={outlineButton}>
+                        My charges
+                      </Link>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionError("");
-                        setActionMessage("");
-                        setConfirmingId(application.id);
-                      }}
-                      disabled={
-                        loading ||
-                        cancellingId !== null ||
-                        needsRefresh
-                      }
-                      className="text-sm font-semibold text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Cancel application
-                    </button>
+                  )}
+
+                  {application.status === "pending" && (
+                    <div className="mt-3">
+                      {confirmingId === application.id ? (
+                        <div
+                          role="group"
+                          aria-labelledby={`cancel-heading-${application.id}`}
+                          className="rounded-xl border border-red-100 bg-red-50/60 p-3 sm:p-4"
+                        >
+                          <h4
+                            id={`cancel-heading-${application.id}`}
+                            className="text-sm font-semibold text-stone-900"
+                          >
+                            Cancel application #{application.id}?
+                          </h4>
+
+                          <p className="mt-1 text-sm leading-6 text-stone-600">
+                            It will no longer be available for staff approval.
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingId(null)}
+                              disabled={cancellingId !== null}
+                              className={outlineButton}
+                            >
+                              Keep application
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCancel(application.id)}
+                              disabled={busy || needsRefresh}
+                              className="min-h-11 rounded-xl bg-red-700
+                                px-4 py-2 text-sm font-semibold text-white
+                                hover:bg-red-800 focus-visible:outline-2
+                                focus-visible:outline-offset-2
+                                focus-visible:outline-red-700
+                                disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {cancellingId === application.id
+                                ? "Cancelling…"
+                                : "Yes, cancel"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionError("");
+                            setActionMessage("");
+                            setConfirmingId(application.id);
+                          }}
+                          disabled={busy || needsRefresh}
+                          className="min-h-11 rounded-lg text-sm font-semibold
+                            text-red-700 underline-offset-4 hover:underline
+                            disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Cancel application
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              </details>
             </article>
           ))}
         </div>
@@ -331,29 +434,26 @@ export default function MyApplicationsPage() {
 
       <nav
         aria-label="Application pages"
-        className="mt-8 flex items-center justify-center gap-4"
+        className="mt-6 flex flex-wrap items-center justify-center gap-3"
       >
         <button
           type="button"
-          disabled={loading || cancellingId !== null || page === 1}
+          disabled={busy || needsRefresh || page === 1}
           onClick={() => changePage(page - 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+          className={outlineButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-600">Page {page}</span>
+        <span aria-current="page" className="text-sm text-[#57534E]">
+          Page {page}
+        </span>
 
         <button
           type="button"
-          disabled={
-            loading ||
-            cancellingId !== null ||
-            Boolean(error) ||
-            !hasNext
-          }
+          disabled={busy || needsRefresh || Boolean(error) || !hasNext}
           onClick={() => changePage(page + 1)}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+          className={outlineButton}
         >
           Next
         </button>
