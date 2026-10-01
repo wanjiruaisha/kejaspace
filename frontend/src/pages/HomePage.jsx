@@ -33,12 +33,12 @@ const steps = [
   {
     title: "Choose your room",
     description:
-      "Compare room types, monthly rent and available spaces, then apply with your preferred move-in date.",
+      "Compare monthly rent and available spaces, then apply with your preferred move-in date.",
   },
   {
     title: "Receive your decision",
     description:
-      "Staff review your application. If approved, your account shows a temporary allocation and the first rent charge.",
+      "Staff review your application. Approval creates a temporary allocation and your first rent charge.",
   },
   {
     title: "Confirm and move in",
@@ -54,80 +54,95 @@ const questions = [
       "Yes. Room listings are public. You only need to log in when you are ready to submit an accommodation application.",
   },
   {
-    question: "Does application approval confirm my reservation?",
+    question: "Does approval confirm my reservation?",
     answer:
       "Approval creates a temporary room hold. Your reservation is confirmed once the first month’s full rent is recorded successfully before your payment deadline.",
   },
   {
-    question: "Where do I check my application and rent?",
+    question: "Where can I check my application and rent?",
     answer:
-      "After logging in as a resident, open My applications to follow your application. My stay shows your allocation, and My charges shows rent charges and payment summaries.",
+      "Log in as a resident and open My applications to follow your application. My stay shows your allocation, while My charges shows rent charges and payment summaries.",
   },
   {
     question: "When can I register visitors or report a repair?",
     answer:
-      "These services become available once staff have checked you in. You can then register expected visitors and submit maintenance requests from your account.",
+      "Once staff have checked you in, you can register expected visitors and submit maintenance requests from your account.",
   },
 ];
 
 const container = "mx-auto w-full max-w-7xl px-5 sm:px-8";
 
+const headingStyle =
+  "font-heading text-xl font-semibold tracking-tight text-[#173F35] sm:text-2xl";
+
+const textLink =
+  "inline-flex items-center gap-2 text-sm font-semibold text-[#245747] underline-offset-4 hover:underline";
+
+const primaryButton =
+  "inline-flex items-center justify-center gap-3 rounded-lg bg-[#245747] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#173F35]";
+
 export default function HomePage() {
   const { user, authLoading } = useAuth();
 
-  const isManagement = Boolean(user && (user.is_staff || user.is_superuser));
+  const isManagement = Boolean(
+    user && (user.is_staff || user.is_superuser),
+  );
 
-  const accountLink = isManagement ? "/staff/dashboard" : "/my-applications";
+  const accountLink = isManagement
+    ? "/staff/dashboard"
+    : "/my-applications";
 
   return (
-    <div className="min-w-0 bg-[#faf9f6] text-slate-900">
-      {/* Full-width photograph */}
+    <div className="min-w-0 bg-[#FAF7F2] text-[#173F35]">
+      {/* Hero: full photo on mobile, narrower photo on desktop */}
       <section
         aria-labelledby="home-heading"
-        className="relative isolate flex min-h-[480px] items-center overflow-hidden bg-slate-900 sm:min-h-[560px]"
+        className="relative isolate overflow-hidden bg-[#173F35]"
       >
-        <img
-          src="/images/home-hero.jpg"
-          alt=""
-          fetchPriority="high"
-          width={736}
-          height={1349}
-          className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_60%] sm:object-[center_65%]"
-        />
+        <div className="absolute inset-0 lg:left-[48%]">
+          <img
+            src="/images/home-hero.jpg"
+            alt=""
+            fetchPriority="high"
+            width={736}
+            height={1349}
+            className="h-full w-full object-cover object-[center_60%]"
+          />
+
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-black/25 lg:bg-black/10"
+          />
+        </div>
 
         <div
-          aria-hidden="true"
-          className="absolute inset-0 -z-10"
-          style={{
-            background:
-              "linear-gradient(90deg, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.65) 45%, rgba(15,23,42,0.2) 100%)",
-          }}
-        />
-
-        <div className={`${container} py-16 sm:py-20`}>
-          <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+          className={`${container} relative flex min-h-[540px] items-center py-12 sm:min-h-[600px] sm:py-16`}
+        >
+          <div className="w-full max-w-xl rounded-2xl border border-white/25 bg-[#102C25]/85 p-6 text-white shadow-2xl supports-[backdrop-filter:blur(1px)]:bg-[#102C25]/65 supports-[backdrop-filter:blur(1px)]:backdrop-blur-xl sm:p-9">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E6D2B5]">
               Welcome to KejaSpace
             </p>
 
             <h1
               id="home-heading"
-              className="mt-5 font-heading text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl"
+              className="mt-5 font-heading text-3xl font-bold leading-tight tracking-tight sm:text-4xl"
             >
-              Find your room.
+              A place to
               <br />
-              Settle into hostel life.
+              <span className="underline decoration-[#DEAB83] decoration-2 underline-offset-8">
+                settle in.
+              </span>
             </h1>
 
-            <p className="mt-5 max-w-md text-sm leading-7 text-white/90 sm:text-base">
-              Explore your accommodation options, apply for a space and keep
-              track of your stay from one account.
+            <p className="mt-6 max-w-md text-sm leading-7 text-white/90">
+              Find your room, plan your move and keep your stay
+              organised. Your accommodation journey starts here.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-4">
               <Link
                 to="/rooms"
-                className="inline-flex items-center justify-center gap-3 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
+                className="inline-flex items-center justify-center gap-3 rounded-lg bg-[#FAF7F2] px-5 py-3 text-sm font-semibold text-[#173F35] transition-colors hover:bg-[#E8EDE4]"
               >
                 Explore rooms
                 <span aria-hidden="true">→</span>
@@ -142,44 +157,52 @@ export default function HomePage() {
                     ? isManagement
                       ? "Open dashboard"
                       : "My applications"
-                    : "Already registered? Log in"}
+                    : "Log in"}
                 </Link>
               )}
             </div>
+
+            <p className="mt-6 border-t border-white/20 pt-4 text-xs leading-5 text-white/80">
+              Browse rooms freely. Create an account when you’re
+              ready to apply.
+            </p>
           </div>
         </div>
 
-        <p className="absolute bottom-4 right-5 text-[11px] text-white/75 sm:right-8">
-          Illustrative room photograph
+        <p className="absolute bottom-3 right-4 rounded bg-black/60 px-2 py-1 text-[10px] text-white sm:right-8">
+          Illustrative shared lounge
         </p>
       </section>
 
-      {/* Short introduction */}
+      {/* Introduction */}
       <section
         aria-labelledby="introduction-heading"
         className={`${container} py-10 sm:py-14`}
       >
-        <div className="grid gap-5 border-b border-slate-200 pb-10 md:grid-cols-2 md:gap-12">
-          <h2
-            id="introduction-heading"
-            className="max-w-md font-heading text-xl font-semibold leading-snug tracking-tight sm:text-2xl"
-          >
-            Your accommodation,
-            <br />
-            from the first application onwards.
-          </h2>
-
-          <div className="max-w-xl">
-            <p className="text-sm leading-7 text-slate-600">
-              Choosing a room is the first step. KejaSpace also helps you follow
-              your application, see your rent charges and keep up with hostel
-              notices throughout your stay.
+        <div className="grid gap-5 border-b border-[#173F35]/15 pb-10 md:grid-cols-2 md:gap-12">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#B45336]">
+              More than a room listing
             </p>
 
-            <Link
-              to="/about"
-              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:underline"
+            <h2
+              id="introduction-heading"
+              className={`mt-3 max-w-md ${headingStyle}`}
             >
+              From your first application
+              to everyday hostel life.
+            </h2>
+          </div>
+
+          <div className="max-w-xl">
+            <p className="text-sm leading-7 text-[#57534E]">
+              Keep track of your application, see what rent is due
+              and follow hostel updates. Once you move in, your account
+              also gives you a place to register visitors and report
+              maintenance issues.
+            </p>
+
+            <Link to="/about" className={`mt-4 ${textLink}`}>
               Get to know KejaSpace
               <span aria-hidden="true">→</span>
             </Link>
@@ -187,63 +210,76 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Room photographs without boxed cards */}
+      {/* Room collection */}
       <section
         aria-labelledby="room-types-heading"
         className={`${container} pb-12 sm:pb-16`}
       >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-slate-500">
-              The room collection
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#B45336]">
+              Find your fit
             </p>
 
             <h2
               id="room-types-heading"
-              className="mt-2 font-heading text-xl font-semibold tracking-tight sm:text-2xl"
+              className={`mt-2 ${headingStyle}`}
             >
-              A little space of your own. Or room to share.
+              Your own room, or room to share.
             </h2>
           </div>
 
-          <Link
-            to="/rooms"
-            className="text-sm font-semibold text-blue-700 hover:underline"
-          >
-            View all rooms →
+          <Link to="/rooms" className={textLink}>
+            View all rooms
+            <span aria-hidden="true">→</span>
           </Link>
         </div>
 
         <div className="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
           {roomTypes.map((room) => (
             <article key={room.name} className="min-w-0">
-              <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-200">
-                <img
-                  src={room.image}
-                  alt={`Illustrative ${room.name.toLowerCase()} room`}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <Link
+                to="/rooms"
+                aria-label={`Browse room listings, including ${room.name.toLowerCase()} rooms`}
+                className="group block rounded-xl"
+              >
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[#E8EDE4]">
+                  <img
+                    src={room.image}
+                    alt={`Illustrative ${room.name.toLowerCase()} room`}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105 motion-safe:group-focus-visible:scale-105"
+                  />
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-heading text-base font-semibold">
-                  {room.name}
-                </h3>
+                  <span className="absolute bottom-3 left-3 rounded-md border border-white/60 bg-white/90 px-3 py-1.5 text-xs font-medium text-[#173F35] backdrop-blur-md">
+                    {room.occupancy}
+                  </span>
+                </div>
 
-                <span className="text-xs text-slate-500">{room.occupancy}</span>
-              </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <h3 className="font-heading text-base font-semibold group-hover:underline group-focus-visible:underline">
+                    {room.name}
+                  </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <span
+                    aria-hidden="true"
+                    className="text-[#B45336]"
+                  >
+                    ↗
+                  </span>
+                </div>
+              </Link>
+
+              <p className="mt-2 text-sm leading-6 text-[#57534E]">
                 {room.description}
               </p>
             </article>
           ))}
         </div>
 
-        <p className="mt-5 text-xs leading-5 text-slate-500">
-          Photos illustrate room types. Check individual listings for current
+        <p className="mt-5 text-xs leading-5 text-[#57534E]">
+          Photos illustrate room types. View listings for current
           prices and available spaces.
         </p>
       </section>
@@ -251,29 +287,37 @@ export default function HomePage() {
       {/* Application guide */}
       <section
         aria-labelledby="process-heading"
-        className="border-y border-slate-200 bg-white"
+        className="border-y border-[#173F35]/10 bg-[#E8EDE4]"
       >
         <div className={`${container} py-10 sm:py-14`}>
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-slate-500">
-                Before you move in
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#B45336]">
+                Planning your move
               </p>
 
               <h2
                 id="process-heading"
-                className="mt-3 font-heading text-xl font-semibold tracking-tight sm:text-2xl"
+                className={`mt-3 ${headingStyle}`}
               >
-                Know what happens next.
+                A few steps.
+                <br />
+                A clear way forward.
               </h2>
 
-              <p className="mt-4 max-w-sm text-sm leading-7 text-slate-600">
-                Your account shows each stage of your application and
-                reservation, including the payment deadline after approval.
+              <p className="mt-4 max-w-sm text-sm leading-7 text-[#57534E]">
+                Follow your progress from your account. After approval,
+                check your payment deadline before confirming your
+                reservation.
               </p>
+
+              <Link to="/rooms" className={`mt-5 ${textLink}`}>
+                Start by choosing a room
+                <span aria-hidden="true">→</span>
+              </Link>
             </div>
 
-            <ol className="divide-y divide-slate-200">
+            <ol className="divide-y divide-[#173F35]/15">
               {steps.map((step, index) => (
                 <li
                   key={step.title}
@@ -281,7 +325,7 @@ export default function HomePage() {
                 >
                   <span
                     aria-hidden="true"
-                    className="pt-0.5 text-sm font-semibold text-blue-700"
+                    className="pt-0.5 text-sm font-semibold text-[#B45336]"
                   >
                     {String(index + 1).padStart(2, "0")}
                   </span>
@@ -291,7 +335,7 @@ export default function HomePage() {
                       {step.title}
                     </h3>
 
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-[#57534E]">
                       {step.description}
                     </p>
                   </div>
@@ -302,33 +346,44 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Expandable questions */}
+      {/* Questions */}
       <section
         aria-labelledby="questions-heading"
         className={`${container} py-10 sm:py-14`}
       >
         <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
           <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#B45336]">
+              Good to know
+            </p>
+
             <h2
               id="questions-heading"
-              className="font-heading text-xl font-semibold tracking-tight sm:text-2xl"
+              className={`mt-3 ${headingStyle}`}
             >
               Before you apply.
             </h2>
 
-            <p className="mt-3 max-w-sm text-sm leading-6 text-slate-600">
-              A few useful things to know about getting started.
+            <p className="mt-3 max-w-sm text-sm leading-6 text-[#57534E]">
+              A few answers to help you get started.
             </p>
           </div>
 
-          <div className="divide-y divide-slate-200 border-y border-slate-200">
+          <div className="divide-y divide-[#173F35]/15 border-y border-[#173F35]/15">
             {questions.map((item) => (
               <details key={item.question} className="group py-4">
-                <summary className="cursor-pointer text-sm font-semibold leading-6 text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-700">
-                  {item.question}
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm text-sm font-semibold leading-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#245747] [&::-webkit-details-marker]:hidden">
+                  <span>{item.question}</span>
+
+                  <span
+                    aria-hidden="true"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[#173F35]/20 text-lg font-normal text-[#245747] motion-safe:transition-transform group-open:rotate-45"
+                  >
+                    +
+                  </span>
                 </summary>
 
-                <p className="mt-3 pl-4 text-sm leading-7 text-slate-600">
+                <p className="mt-3 pr-8 text-sm leading-7 text-[#57534E]">
                   {item.answer}
                 </p>
               </details>
@@ -337,25 +392,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Simple closing invitation */}
-      <section className="bg-[#eaeef2]">
+      {/* Closing invitation */}
+      <section className="border-t border-[#173F35]/10 bg-white/60">
         <div
           className={`${container} flex flex-col items-start justify-between gap-5 py-8 sm:flex-row sm:items-center sm:py-10`}
         >
           <div>
             <h2 className="font-heading text-xl font-semibold tracking-tight">
-              Start with a look around.
+              Take a look. Find your fit.
             </h2>
 
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Compare rooms before deciding where to apply.
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Compare your options before deciding where to apply.
             </p>
           </div>
 
-          <Link
-            to="/rooms"
-            className="inline-flex shrink-0 items-center justify-center gap-3 rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800"
-          >
+          <Link to="/rooms" className={`${primaryButton} shrink-0`}>
             Browse rooms
             <span aria-hidden="true">→</span>
           </Link>

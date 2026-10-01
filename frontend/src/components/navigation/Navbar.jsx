@@ -13,6 +13,11 @@ const publicLinks = [
 
 const accountLinks = [
   {
+    label: "Dashboard",
+    to: "/staff/dashboard",
+    roles: ["staff", "admin"],
+  },
+  {
     label: "My applications",
     to: "/my-applications",
     roles: ["resident"],
@@ -48,6 +53,11 @@ const accountLinks = [
     roles: ["staff", "admin"],
   },
   {
+    label: "Rent & payments",
+    to: "/staff/rent-payments",
+    roles: ["staff", "admin"],
+  },
+  {
     label: "Maintenance",
     to: "/staff/maintenance",
     roles: ["staff", "admin"],
@@ -62,11 +72,6 @@ const accountLinks = [
     to: "/announcements",
     roles: ["resident", "staff", "admin"],
   },
-  {
-  label: "Rent & payments",
-  to: "/staff/rent-payments",
-  roles: ["staff", "admin"],
-  },
 ];
 
 const adminLinks = [
@@ -75,13 +80,14 @@ const adminLinks = [
   { label: "Manage announcements", to: "/admin/announcements" },
 ];
 
-function linkStyle({ isActive }) {
+function dropdownLinkStyle({ isActive }) {
   return [
-    "block rounded-xl px-4 py-3 text-sm font-semibold transition",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
+    "block rounded-lg px-3 py-2.5 text-sm font-medium transition",
+    "focus-visible:outline-2 focus-visible:outline-offset-2",
+    "focus-visible:outline-[#245747]",
     isActive
-      ? "bg-blue-50 text-blue-700"
-      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+      ? "bg-[#E3EDE3] text-[#173F35]"
+      : "text-[#57534E] hover:bg-[#EEF2EA] hover:text-[#173F35]",
   ].join(" ");
 }
 
@@ -90,6 +96,7 @@ export default function Navbar() {
   const { pathname } = useLocation();
 
   const [menuOpen, setMenuOpen] = useState(false);
+
   const menuRef = useRef(null);
   const toggleRef = useRef(null);
 
@@ -105,12 +112,10 @@ export default function Navbar() {
     item.roles.includes(role),
   );
 
-  // Close navigation after changing pages or accounts.
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname, user?.id, role]);
 
-  // Close with Escape or by clicking outside the menu.
   useEffect(() => {
     if (!menuOpen) return;
 
@@ -121,117 +126,146 @@ export default function Navbar() {
       }
     }
 
-    function handlePointerDown(event) {
-      if (
-        !menuRef.current?.contains(event.target) &&
-        !toggleRef.current?.contains(event.target)
-      ) {
-        setMenuOpen(false);
-      }
-    }
+    function handleOutsideInteraction(event) {
+      const insideMenu = menuRef.current?.contains(event.target);
+      const insideToggle = toggleRef.current?.contains(event.target);
 
-    // Also close when keyboard focus moves outside the menu.
-    function handleFocusIn(event) {
-      if (
-        !menuRef.current?.contains(event.target) &&
-        !toggleRef.current?.contains(event.target)
-      ) {
+      if (!insideMenu && !insideToggle) {
         setMenuOpen(false);
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("pointerdown", handleOutsideInteraction);
+    document.addEventListener("focusin", handleOutsideInteraction);
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("pointerdown", handleOutsideInteraction);
+      document.removeEventListener("focusin", handleOutsideInteraction);
     };
   }, [menuOpen]);
 
-  function renderLinks(items) {
-    return items.map((item) => (
-      <NavLink
-        key={item.to}
-        to={item.to}
-        end={item.to === "/"}
-        className={linkStyle}
-        onClick={() => setMenuOpen(false)}
-      >
-        {item.label}
-      </NavLink>
-    ));
+  function closeMenu() {
+    setMenuOpen(false);
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header
+      className="sticky top-0 z-40 border-b border-[#245747]/15
+        bg-gradient-to-r from-[#FAF7F2] via-[#EDF3E8] to-[#D6E7DD]
+        shadow-[0_4px_20px_rgba(23,63,53,0.07)]"
+    >
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-blue-700"
+        className="sr-only focus:not-sr-only focus:absolute
+          focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg
+          focus:bg-white focus:p-3 focus:text-[#173F35]"
       >
         Skip to content
       </a>
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-8">
-        <div className="flex h-20 items-center justify-between gap-3">
+        <div className="flex h-18 items-center justify-between gap-3">
+          {/* Brand */}
           <Link
             to="/"
             aria-label="KejaSpace home"
-            className="flex shrink-0 items-center gap-2 sm:gap-3"
+            onClick={closeMenu}
+            className="group inline-flex shrink-0 items-center gap-2.5"
           >
             <span
               aria-hidden="true"
-              className="flex size-10 items-center justify-center rounded-2xl bg-blue-700 text-lg font-bold text-white"
+              className="flex size-10 items-center justify-center
+                rounded-t-xl rounded-b-md
+                bg-gradient-to-br from-[#39735D] to-[#173F35]
+                font-heading text-lg font-bold text-white
+                shadow-[0_4px_10px_rgba(23,63,53,0.18)]
+                transition-transform motion-safe:group-hover:-rotate-6"
             >
               K
             </span>
 
-            <span className="font-heading text-base font-bold tracking-tight text-slate-900 sm:text-lg">
-              Keja<span className="text-blue-700">Space</span>
+            <span className="font-heading text-lg font-bold tracking-tight text-[#173F35]">
+              KejaSpace
+              <span className="text-[#B45336]">.</span>
             </span>
           </Link>
 
+          {/* Public navigation on larger screens */}
           <nav
             aria-label="Main navigation"
-            className="hidden items-center gap-1 md:flex"
+            className="hidden items-center gap-7 md:flex"
           >
-            {renderLinks(publicLinks)}
+            {publicLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  [
+                    "border-b-2 px-1 py-2 text-sm font-semibold transition",
+                    isActive
+                      ? "border-[#B45336] text-[#173F35]"
+                      : "border-transparent text-[#57534E] hover:border-[#B45336]/50 hover:text-[#173F35]",
+                  ].join(" ")
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
 
+          {/* Account and menu controls */}
           <div className="flex min-w-0 items-center gap-3">
-            {!authLoading && user && (
-              <div className="hidden min-w-0 text-right lg:block">
-                <p className="max-w-32 truncate text-sm font-semibold text-slate-900">
-                  {user.username}
-                </p>
+            {!authLoading && !user && (
+              <Link
+                to="/login"
+                className="hidden rounded-lg px-3 py-2 text-sm
+                  font-semibold text-[#173F35] transition
+                  hover:bg-white/50 sm:inline-flex"
+              >
+                Log in
+              </Link>
+            )}
 
-                <p className="text-xs capitalize text-slate-500">
-                  {role}
-                </p>
-              </div>
+            {!authLoading && user && (
+              <span className="hidden max-w-32 truncate text-sm font-medium text-[#173F35] lg:block">
+                Hi, {user.username}
+              </span>
             )}
 
             <button
               ref={toggleRef}
               type="button"
               aria-expanded={menuOpen}
-              aria-controls="account-navigation"
+              aria-controls="navbar-menu"
               aria-label={
-                menuOpen ? "Close navigation menu" : "Open navigation menu"
+                menuOpen
+                  ? "Close navigation menu"
+                  : "Open navigation menu"
               }
               onClick={() => setMenuOpen((previous) => !previous)}
-              className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              className="inline-flex min-h-11 shrink-0 items-center
+                justify-center gap-2 rounded-xl border border-white/70
+                bg-white/60 px-3.5 py-2 text-sm font-semibold
+                text-[#173F35] shadow-sm backdrop-blur-md transition
+                hover:border-[#245747]/25 hover:bg-white/90
+                focus-visible:outline-2 focus-visible:outline-offset-4
+                focus-visible:outline-[#245747]"
             >
+              <span className="hidden sm:inline">
+                {menuOpen ? "Close" : "Menu"}
+              </span>
+
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 aria-hidden="true"
               >
@@ -248,109 +282,160 @@ export default function Navbar() {
                   </>
                 )}
               </svg>
-
-              <span className="hidden sm:inline">
-                {menuOpen ? "Close" : "Menu"}
-              </span>
             </button>
           </div>
         </div>
 
-        {menuOpen && (
-          <div
-            ref={menuRef}
-            id="account-navigation"
-            className="absolute right-4 top-full mt-2 max-h-[calc(100dvh-6rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-xl sm:right-8"
-          >
-            <div className="border-b border-slate-100 p-5">
-              {authLoading ? (
-                <LoadingMessage label="Checking session…" compact />
-              ) : user ? (
-                <>
-                  <p className="break-words font-bold text-slate-900">
+        {/* Dropdown stays above the page instead of pushing it down */}
+        <div
+          ref={menuRef}
+          id="navbar-menu"
+          hidden={!menuOpen}
+          className="absolute right-4 top-full mt-2
+            max-h-[calc(100dvh-6rem)] w-80
+            max-w-[calc(100vw-2rem)] overflow-y-auto
+            overscroll-contain rounded-2xl border border-[#245747]/15
+            bg-[#FCFAF6] shadow-[0_20px_60px_rgba(23,63,53,0.18)]
+            sm:right-8"
+        >
+          {/* Account information */}
+          <div className="border-b border-[#245747]/10 bg-[#E8EDE4]/60 p-4">
+            {authLoading ? (
+              <LoadingMessage label="Checking session…" compact />
+            ) : user ? (
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center
+                    justify-center rounded-xl bg-[#245747]
+                    text-sm font-bold text-white"
+                >
+                  {user.username?.charAt(0).toUpperCase() || "K"}
+                </span>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#173F35]">
                     {user.username}
                   </p>
 
-                  <p className="mt-1 text-sm capitalize text-slate-500">
-                    {role} account
+                  <p className="mt-0.5 text-xs capitalize text-[#57534E]">
+                    {role === "admin" ? "Administrator" : role}
                   </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-bold text-slate-900">
-                    Welcome to KejaSpace
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    Find and manage your space.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <nav aria-label="Account navigation" className="p-3">
-              <div className="md:hidden">
-                <p className="px-4 pb-2 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Explore
-                </p>
-
-                <div className="flex flex-col gap-1">
-                  {renderLinks(publicLinks)}
                 </div>
               </div>
+            ) : (
+              <div>
+                <p className="font-heading text-sm font-bold text-[#173F35]">
+                  Welcome to KejaSpace
+                </p>
 
-              {!authLoading && user && (
-                <div className="mt-3 md:mt-0">
-                  <p className="px-4 pb-2 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    {role === "resident" ? "My accommodation" : "Hostel operations"}
-                  </p>
-
-                  <div className="flex flex-col gap-1">
-                    {renderLinks(visibleLinks)}
-                  </div>
-                </div>
-              )}
-
-              {!authLoading && role === "admin" && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <p className="px-4 pb-2 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Administration
-                  </p>
-
-                  <div className="flex flex-col gap-1">
-                    {renderLinks(adminLinks)}
-                  </div>
-                </div>
-              )}
-            </nav>
-
-            {!authLoading && (
-              <div className="border-t border-slate-100 p-4">
-                {user ? (
-                  <LogoutButton />
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <Link
-                      to="/login"
-                      onClick={() => setMenuOpen(false)}
-                      className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Log in
-                    </Link>
-
-                    <Link
-                      to="/register"
-                      onClick={() => setMenuOpen(false)}
-                      className="rounded-xl bg-blue-700 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800"
-                    >
-                      Create account
-                    </Link>
-                  </div>
-                )}
+                <p className="mt-1 text-xs leading-5 text-[#57534E]">
+                  Find your room and manage your stay.
+                </p>
               </div>
             )}
           </div>
-        )}
+
+          <div className="p-3">
+            {/* Public links in the mobile menu */}
+            <nav
+              aria-label="Mobile navigation"
+              className="space-y-1 md:hidden"
+            >
+              {publicLinks.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  onClick={closeMenu}
+                  className={dropdownLinkStyle}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+
+            {!authLoading && user && (
+              <>
+                <nav
+                  aria-label="Account navigation"
+                  className="mt-3 space-y-1 border-t
+                    border-[#245747]/10 pt-3 md:mt-0
+                    md:border-t-0 md:pt-0"
+                >
+                  <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-[#78716C]">
+                    Your account
+                  </p>
+
+                  {visibleLinks.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={closeMenu}
+                      className={dropdownLinkStyle}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </nav>
+
+                {role === "admin" && (
+                  <nav
+                    aria-label="Administration navigation"
+                    className="mt-3 space-y-1 border-t border-[#245747]/10 pt-3"
+                  >
+                    <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-[#78716C]">
+                      Administration
+                    </p>
+
+                    {adminLinks.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={closeMenu}
+                        className={dropdownLinkStyle}
+                      >
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </nav>
+                )}
+              </>
+            )}
+          </div>
+
+          {!authLoading && (
+            <div className="border-t border-[#245747]/10 p-4">
+              {user ? (
+                <LogoutButton />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    to="/login"
+                    onClick={closeMenu}
+                    className="inline-flex min-h-11 items-center
+                      justify-center rounded-xl border border-[#245747]/25
+                      px-3 py-2 text-sm font-semibold text-[#173F35]
+                      transition hover:bg-[#E8EDE4]"
+                  >
+                    Log in
+                  </Link>
+
+                  <Link
+                    to="/register"
+                    onClick={closeMenu}
+                    className="inline-flex min-h-11 items-center
+                      justify-center rounded-xl bg-[#245747]
+                      px-3 py-2 text-sm font-semibold text-white
+                      transition hover:bg-[#173F35]"
+                  >
+                    Create account
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
