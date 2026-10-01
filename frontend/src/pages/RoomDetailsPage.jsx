@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 
 import { fetchWithTimeout } from "../services/fetchWithTimeout";
 import useAuth from "../hooks/useAuth";
-import { getRoomImages } from "../utils/roomImages";
+import { getRoomCoverImage } from "../utils/roomImages";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -21,98 +21,63 @@ const currency = new Intl.NumberFormat("en-KE", {
   maximumFractionDigits: 2,
 });
 
-function RoomGallery({ capacity, roomNumber }) {
-  const images = getRoomImages(capacity);
+const buttonStyle =
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 " +
+  "rounded-xl bg-[#245747] px-4 py-2.5 text-sm font-semibold text-white " +
+  "transition-colors hover:bg-[#173F35] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-4 " +
+  "focus-visible:outline-[#245747]";
 
-  const [selectedImage, setSelectedImage] = useState(images[0] || null);
-  const [failedImages, setFailedImages] = useState([]);
-
-  const availableImages = images.filter(
-    (image) => !failedImages.includes(image),
-  );
-
-  const activeImage = availableImages.includes(selectedImage)
-    ? selectedImage
-    : availableImages[0];
-
-  const roomType = roomTypes[capacity] || `${capacity}-person room`;
-
-  function handleImageError(image) {
-    setFailedImages((previous) =>
-      previous.includes(image) ? previous : [...previous, image],
-    );
+function formatPrice(value) {
+  if (value === null || value === undefined || value === "") {
+    return "Price unavailable";
   }
 
-  if (!activeImage) {
-    return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-blue-50 p-6 text-center">
-        <div>
-          <p className="text-3xl font-bold text-blue-700">
-            Room {roomNumber}
-          </p>
-          <p className="mt-3 text-sm text-slate-600">
-            Room photos are currently unavailable.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const amount = Number(value);
 
-  const activeIndex = availableImages.indexOf(activeImage);
+  return Number.isFinite(amount)
+    ? currency.format(amount)
+    : "Price unavailable";
+}
+
+function RoomPhoto({ room }) {
+  const image = getRoomCoverImage(room);
+  const [failedSource, setFailedSource] = useState(null);
+
+  const showImage = Boolean(image) && failedSource !== image;
 
   return (
-    <div>
-      <figure>
-        <div className="relative overflow-hidden rounded-2xl bg-slate-100">
+    <figure>
+      <div className="overflow-hidden rounded-xl border border-[#245747]/10 bg-[#E8EDE4]">
+        {showImage ? (
           <img
-            key={activeImage}
-            src={activeImage}
-            alt={`${roomType} example, photo ${images.indexOf(activeImage) + 1}`}
-            onError={() => handleImageError(activeImage)}
-            className="aspect-[4/3] w-full object-cover"
+            src={image}
+            alt={`Illustrative photo for room ${room.room_number}`}
+            decoding="async"
+            onError={() => setFailedSource(image)}
+            className="h-56 w-full object-cover sm:h-64 lg:h-72"
           />
+        ) : (
+          <div className="flex h-56 items-center justify-center p-5 text-center sm:h-64 lg:h-72">
+            <div>
+              <p className="font-heading text-xl font-bold text-[#173F35]">
+                Room {room.room_number}
+              </p>
 
-          <span className="absolute bottom-4 right-4 rounded-full bg-slate-950/75 px-3 py-1 text-xs font-semibold text-white">
-            {activeIndex + 1} / {availableImages.length}
-          </span>
-        </div>
+              <p className="mt-2 text-sm text-[#57534E]">
+                Photo unavailable.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
-        <figcaption className="mt-3 text-xs leading-6 text-slate-500">
-          Illustrative photos of this room type. Individual rooms may differ.
+      {showImage && (
+        <figcaption className="mt-2 text-xs leading-5 text-[#78716C]">
+          Illustrative photo. Actual room appearance may differ.
         </figcaption>
-      </figure>
-
-      {availableImages.length > 1 && (
-        <div
-          role="group"
-          aria-label="Choose a room photo"
-          className="mt-4 flex flex-wrap gap-3"
-        >
-          {availableImages.map((image) => (
-            <button
-              key={image}
-              type="button"
-              onClick={() => setSelectedImage(image)}
-              aria-label={`Show room photo ${images.indexOf(image) + 1}`}
-              aria-pressed={activeImage === image}
-              className={`w-20 overflow-hidden rounded-xl border-2 p-1 transition sm:w-24 ${
-                activeImage === image
-                  ? "border-blue-700 bg-blue-50"
-                  : "border-slate-200 bg-white hover:border-blue-400"
-              }`}
-            >
-              <img
-                src={image}
-                alt=""
-                loading="lazy"
-                onError={() => handleImageError(image)}
-                className="aspect-[4/3] w-full rounded-lg object-cover"
-              />
-            </button>
-          ))}
-        </div>
       )}
-    </div>
+    </figure>
   );
 }
 
@@ -166,7 +131,7 @@ export default function RoomDetailsPage() {
           setError(
             err instanceof TypeError
               ? "Could not connect to the server. Please try again."
-              : err.message,
+              : err.message || "Could not load this room.",
           );
         }
       } finally {
@@ -182,156 +147,189 @@ export default function RoomDetailsPage() {
   }, [id, retry]);
 
   return (
-    <section>
+    <section className="mx-auto w-full min-w-0 max-w-5xl">
       <Link
         to="/rooms"
-        className="text-sm font-semibold text-blue-700 hover:underline"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg
+          text-sm font-semibold text-[#245747] underline-offset-4
+          hover:underline focus-visible:outline-2
+          focus-visible:outline-offset-4 focus-visible:outline-[#245747]"
       >
-        ← Back to rooms
+        <span aria-hidden="true">←</span>
+        Back to rooms
       </Link>
 
       {loading ? (
-        <p role="status" className="mt-8 text-slate-600">
-          Loading room details…
-        </p>
+        <div className="mt-4">
+          <p role="status" className="text-sm text-[#57534E]">
+            Loading room details…
+          </p>
+
+          <div
+            aria-hidden="true"
+            className="mt-4 grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]"
+          >
+            <div className="h-64 rounded-2xl bg-[#E8EDE4] motion-safe:animate-pulse" />
+            <div className="h-56 rounded-2xl bg-[#E8EDE4] motion-safe:animate-pulse" />
+          </div>
+        </div>
       ) : error ? (
         <div
           role="alert"
-          className="mt-8 rounded-2xl bg-red-50 p-6 text-red-800"
+          className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800"
         >
           <p>{error}</p>
 
           <button
             type="button"
             onClick={() => setRetry((value) => value + 1)}
-            className="mt-4 font-semibold underline"
+            className="mt-2 min-h-11 font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : room ? (
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
-          <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 lg:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-              {roomTypes[room.capacity] ||
-                `${room.capacity}-person room`}
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                Room {room.room_number}
-              </h1>
-
-              <span
-                className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                  room.available_spaces > 0
-                    ? "bg-emerald-50 text-emerald-800"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {room.available_spaces > 0
-                  ? "Spaces available"
-                  : "Currently full"}
-              </span>
-            </div>
-
-            <div className="mt-7">
-              <RoomGallery
-                key={`${room.id}-${room.capacity}`}
-                capacity={room.capacity}
-                roomNumber={room.room_number}
-              />
-            </div>
-
-            <h2 className="mt-9 text-lg font-bold text-slate-900">
-              About this room
-            </h2>
-
-            <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">
-              {room.description || "No description has been added yet."}
-            </p>
-
-            <dl className="mt-8 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-5">
-                <dt className="text-sm text-slate-500">
-                  Room capacity
-                </dt>
-
-                <dd className="mt-2 text-2xl font-bold text-slate-900">
-                  {room.capacity}
-                </dd>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-5">
-                <dt className="text-sm text-slate-500">
-                  Available spaces
-                </dt>
-
-                <dd className="mt-2 text-2xl font-bold text-slate-900">
-                  {room.available_spaces}
-                </dd>
-              </div>
-            </dl>
-          </article>
-
-          <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-7">
-            <h2 className="text-sm font-semibold text-slate-500">
-              Monthly rent
-            </h2>
-
-            <p className="mt-3 break-words text-3xl font-bold tracking-tight text-blue-700">
-              {currency.format(Number(room.monthly_price))}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              Per resident
-            </p>
-
-            <div className="mt-6 border-t border-slate-100 pt-6">
-              <h3 className="font-semibold text-slate-900">
-                How the reservation works
-              </h3>
-
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Submit an accommodation application for staff review.
-                After approval, pay the first month’s full rent before
-                your payment deadline to confirm your reservation.
+        <>
+          {/* Compact room heading */}
+          <header className="mt-3 flex flex-wrap items-center justify-between gap-3 border-b border-[#245747]/15 pb-4">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#965038]">
+                {roomTypes[room.capacity] ||
+                  `${room.capacity}-person room`}
               </p>
 
-              {!authLoading && (
-                <div className="mt-6">
-                  {isResident ? (
+              <h1 className="mt-1 break-words font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+                Room {room.room_number}
+              </h1>
+            </div>
+
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full
+                px-3 py-1.5 text-xs font-semibold ${
+                  Number(room.available_spaces) > 0
+                    ? "bg-[#E8EDE4] text-[#245747]"
+                    : "bg-stone-100 text-stone-600"
+                }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`size-1.5 rounded-full ${
+                  Number(room.available_spaces) > 0
+                    ? "bg-[#39735D]"
+                    : "bg-stone-400"
+                }`}
+              />
+
+              {Number(room.available_spaces) > 0
+                ? "Spaces available"
+                : "Currently full"}
+            </span>
+          </header>
+
+          <div className="mt-5 grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
+            {/* Photo and room information */}
+            <article className="min-w-0 rounded-2xl border border-[#245747]/10 bg-white p-4 sm:p-5">
+              <RoomPhoto key={room.id} room={room} />
+
+              <div className="mt-5">
+                <h2 className="font-heading text-sm font-bold text-[#173F35]">
+                  About this room
+                </h2>
+
+                <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-[#57534E]">
+                  {room.description || "No description has been added yet."}
+                </p>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[#245747]/10 pt-4">
+                <div>
+                  <dt className="text-xs text-[#57534E]">
+                    Room capacity
+                  </dt>
+
+                  <dd className="mt-1 text-base font-semibold text-[#173F35]">
+                    {room.capacity}{" "}
+                    <span className="text-xs font-normal text-[#57534E]">
+                      {Number(room.capacity) === 1 ? "person" : "people"}
+                    </span>
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs text-[#57534E]">
+                    Available spaces
+                  </dt>
+
+                  <dd className="mt-1 text-base font-semibold text-[#173F35]">
+                    {room.available_spaces}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+
+            {/* Compact rent and application card */}
+            <aside className="min-w-0 overflow-hidden rounded-2xl border border-[#245747]/15 bg-white shadow-sm">
+              <div className="bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#D6E7DD] p-4 sm:p-5">
+                <h2 className="text-xs font-semibold text-[#245747]">
+                  Monthly rent
+                </h2>
+
+                <p className="mt-2 break-words font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+                  {formatPrice(room.monthly_price)}
+                </p>
+
+                <p className="mt-1 text-xs text-[#57534E]">
+                  Per resident, per month
+                </p>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                <h3 className="font-heading text-sm font-bold text-[#173F35]">
+                  How to reserve
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-[#57534E]">
+                  Submit your application for staff review. After approval,
+                  pay the first month’s full rent before the deadline to
+                  confirm your reservation.
+                </p>
+
+                <div className="mt-4">
+                  {authLoading ? (
+                    <p role="status" className="text-sm text-[#57534E]">
+                      Checking your session…
+                    </p>
+                  ) : isResident ? (
                     <Link
                       to={`/rooms/${room.id}/apply`}
-                      className="block rounded-xl bg-blue-700 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800"
+                      className={buttonStyle}
                     >
                       Apply for this room
+                      <span aria-hidden="true">→</span>
                     </Link>
                   ) : !user ? (
                     <>
-                      <Link
-                        to="/login"
-                        className="block rounded-xl bg-blue-700 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800"
-                      >
+                      <Link to="/login" className={buttonStyle}>
                         Log in to apply
+                        <span aria-hidden="true">→</span>
                       </Link>
 
-                      <p className="mt-3 text-xs leading-6 text-slate-500">
+                      <p className="mt-2 text-xs leading-5 text-[#57534E]">
                         After logging in, return to this room to submit
                         your application.
                       </p>
                     </>
                   ) : null}
                 </div>
-              )}
 
-              <p className="mt-5 text-xs leading-6 text-slate-500">
-                Availability is checked again when staff review your
-                application. Applying does not guarantee a space.
-              </p>
-            </div>
-          </aside>
-        </div>
+                <p className="mt-4 border-t border-[#245747]/10 pt-3 text-xs leading-5 text-[#78716C]">
+                  Staff check availability when reviewing your application.
+                  Applying does not guarantee a space.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </>
       ) : null}
     </section>
   );
