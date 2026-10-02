@@ -15,6 +15,36 @@ const methodLabels = {
   mpesa: "M-Pesa",
 };
 
+const methodStyles = {
+  cash: "bg-[#E8EDE4] text-[#245747]",
+  bank: "bg-[#F8EDE5] text-[#965038]",
+  mpesa: "bg-emerald-50 text-emerald-800",
+};
+
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#EDF3E8]";
+
+const inputStyle =
+  "mt-2 min-h-11 w-full min-w-0 rounded-xl border border-[#245747]/20 " +
+  "bg-white px-3.5 py-2.5 text-sm text-[#173F35] " +
+  "placeholder:text-[#78716C] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+const labelStyle = "block text-sm font-semibold text-[#173F35]";
+
 const moneyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",
   currency: "KES",
@@ -22,20 +52,46 @@ const moneyFormatter = new Intl.NumberFormat("en-KE", {
   maximumFractionDigits: 2,
 });
 
+const dateFormatter = new Intl.DateTimeFormat("en-KE", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Africa/Nairobi",
+});
+
 function formatMoney(value) {
-  return moneyFormatter.format(Number(value));
+  const amount = Number(value);
+
+  if (
+    value == null ||
+    String(value).trim() === "" ||
+    !Number.isFinite(amount)
+  ) {
+    return "Unavailable";
+  }
+
+  return moneyFormatter.format(amount);
 }
 
 function formatDate(value) {
+  if (!value) return "Unavailable";
+
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "Unavailable";
+  return Number.isNaN(date.getTime())
+    ? "Unavailable"
+    : dateFormatter.format(date);
+}
 
-  return new Intl.DateTimeFormat("en-KE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Africa/Nairobi",
-  }).format(date);
+function MethodBadge({ method }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        methodStyles[method] || "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {methodLabels[method] || method || "Unavailable"}
+    </span>
+  );
 }
 
 export default function PaymentReportPage() {
@@ -127,6 +183,8 @@ export default function PaymentReportPage() {
   function applyFilters(event) {
     event.preventDefault();
 
+    if (loading) return;
+
     if (
       draftFilters.startDate &&
       draftFilters.endDate &&
@@ -148,6 +206,8 @@ export default function PaymentReportPage() {
   }
 
   function resetFilters() {
+    if (loading) return;
+
     setDraftFilters({ ...emptyFilters });
     setFilters({ ...emptyFilters });
     setFilterError("");
@@ -157,318 +217,429 @@ export default function PaymentReportPage() {
   }
 
   function refreshReport() {
+    if (loading) return;
+
     setExpandedId(null);
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
   function changePage(nextPage) {
+    if (loading || nextPage < 1 || nextPage === page) return;
+
     setExpandedId(null);
     setLoading(true);
     setPage(nextPage);
   }
 
+  const hasAppliedFilters = Object.values(filters).some(Boolean);
+
+  const filtersChanged = Object.keys(emptyFilters).some((key) => {
+    const draftValue =
+      key === "search" ? draftFilters.search.trim() : draftFilters[key];
+
+    return draftValue !== filters[key];
+  });
+
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Reports
-          </p>
+    <section className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
+      {/* Page header */}
+      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+              Reports
+            </p>
 
-          <h1 className="page-title mt-2">Payment report</h1>
+            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+              Payment report
+            </h1>
 
-          <p className="page-description">
-            Review recorded payments by resident, room, date and payment method.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={refreshReport}
-          disabled={loading}
-          className="button-secondary"
-        >
-          {loading ? "Loading…" : "Refresh"}
-        </button>
-      </header>
-
-      <form
-        onSubmit={applyFilters}
-        className="rounded-2xl border border-slate-200 bg-white p-4"
-      >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <label htmlFor="payment-search" className="form-label">
-              Search
-            </label>
-
-            <input
-              id="payment-search"
-              name="search"
-              type="search"
-              value={draftFilters.search}
-              onChange={updateFilter}
-              placeholder="Resident, room or reference"
-              className="form-input"
-            />
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Find recorded payments by resident, room, reference,
+              payment method or date.
+            </p>
           </div>
-
-          <div>
-            <label htmlFor="payment-method" className="form-label">
-              Payment method
-            </label>
-
-            <select
-              id="payment-method"
-              name="method"
-              value={draftFilters.method}
-              onChange={updateFilter}
-              className="form-input"
-            >
-              <option value="">All methods</option>
-              <option value="cash">Cash</option>
-              <option value="bank">Bank</option>
-              <option value="mpesa">M-Pesa</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="payment-start-date" className="form-label">
-              Recorded from
-            </label>
-
-            <input
-              id="payment-start-date"
-              name="startDate"
-              type="date"
-              value={draftFilters.startDate}
-              onChange={updateFilter}
-              className="form-input"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="payment-end-date" className="form-label">
-              Recorded through
-            </label>
-
-            <input
-              id="payment-end-date"
-              name="endDate"
-              type="date"
-              value={draftFilters.endDate}
-              onChange={updateFilter}
-              className="form-input"
-            />
-          </div>
-        </div>
-
-        {filterError && (
-          <p role="alert" className="mt-3 text-sm text-red-700">
-            {filterError}
-          </p>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="button-primary"
-          >
-            Apply filters
-          </button>
 
           <button
             type="button"
-            onClick={resetFilters}
+            onClick={refreshReport}
             disabled={loading}
-            className="button-secondary"
+            className={secondaryButton}
           >
-            Reset
+            {loading ? "Loading…" : "Refresh report"}
           </button>
+        </div>
+      </header>
 
-          {!loading && !error && (
-            <p role="status" className="text-sm text-slate-500 sm:ml-auto">
-              {count} matching {count === 1 ? "payment" : "payments"}
+      {/* Search and filters */}
+      <form
+        onSubmit={applyFilters}
+        aria-describedby={filterError ? "payment-filter-error" : undefined}
+        className="rounded-2xl border border-[#245747]/15 bg-white p-4 sm:p-5"
+      >
+        <fieldset disabled={loading} className="min-w-0">
+          <legend className="sr-only">Filter recorded payments</legend>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="min-w-0">
+              <label htmlFor="payment-search" className={labelStyle}>
+                Search
+              </label>
+
+              <input
+                id="payment-search"
+                name="search"
+                type="search"
+                value={draftFilters.search}
+                onChange={updateFilter}
+                placeholder="Resident, room or reference"
+                className={inputStyle}
+              />
+            </div>
+
+            <div className="min-w-0">
+              <label htmlFor="payment-method" className={labelStyle}>
+                Payment method
+              </label>
+
+              <select
+                id="payment-method"
+                name="method"
+                value={draftFilters.method}
+                onChange={updateFilter}
+                className={inputStyle}
+              >
+                <option value="">All methods</option>
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+                <option value="mpesa">M-Pesa</option>
+              </select>
+            </div>
+
+            <div className="min-w-0">
+              <label htmlFor="payment-start-date" className={labelStyle}>
+                Recorded from
+              </label>
+
+              <input
+                id="payment-start-date"
+                name="startDate"
+                type="date"
+                value={draftFilters.startDate}
+                onChange={updateFilter}
+                className={inputStyle}
+              />
+            </div>
+
+            <div className="min-w-0">
+              <label htmlFor="payment-end-date" className={labelStyle}>
+                Recorded through
+              </label>
+
+              <input
+                id="payment-end-date"
+                name="endDate"
+                type="date"
+                value={draftFilters.endDate}
+                onChange={updateFilter}
+                aria-invalid={Boolean(filterError)}
+                aria-describedby={
+                  filterError ? "payment-filter-error" : undefined
+                }
+                className={inputStyle}
+              />
+            </div>
+          </div>
+
+          {filterError && (
+            <p
+              id="payment-filter-error"
+              role="alert"
+              className="mt-3 text-sm leading-6 text-red-700"
+            >
+              {filterError}
             </p>
           )}
-        </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={primaryButton}
+            >
+              Apply filters
+            </button>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={loading}
+              className={secondaryButton}
+            >
+              Reset
+            </button>
+
+            {filtersChanged && !loading && (
+              <p className="text-xs leading-5 text-[#965038] sm:ml-2">
+                Select Apply filters to update the results.
+              </p>
+            )}
+          </div>
+        </fieldset>
       </form>
 
+      {/* Applied filters describe the results currently being displayed. */}
+      {hasAppliedFilters && (
+        <div
+          aria-label="Applied payment filters"
+          className="flex flex-wrap items-center gap-2 text-xs text-[#245747]"
+        >
+          <span className="font-semibold">Applied:</span>
+
+          {filters.search && (
+            <span className="max-w-full break-words rounded-lg bg-[#E8EDE4] px-3 py-2">
+              Search: {filters.search}
+            </span>
+          )}
+
+          {filters.method && (
+            <span className="rounded-lg bg-[#E8EDE4] px-3 py-2">
+              Method: {methodLabels[filters.method] || filters.method}
+            </span>
+          )}
+
+          {filters.startDate && (
+            <span className="rounded-lg bg-[#E8EDE4] px-3 py-2">
+              From: {filters.startDate}
+            </span>
+          )}
+
+          {filters.endDate && (
+            <span className="rounded-lg bg-[#E8EDE4] px-3 py-2">
+              Through: {filters.endDate}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-heading text-base font-semibold text-[#173F35]">
+          Recorded payments
+        </h2>
+
+        {!loading && !error && (
+          <p role="status" className="text-xs leading-6 text-[#78716C]">
+            <span className="font-semibold text-[#173F35]">{count}</span>{" "}
+            matching {count === 1 ? "payment" : "payments"} ·{" "}
+            {payments.length} shown on this page
+          </p>
+        )}
+      </div>
+
+      {/* Payment list */}
       {loading ? (
         <p
           role="status"
-          className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600"
+          className="rounded-2xl border border-[#245747]/15 bg-white p-6 text-sm text-[#57534E]"
         >
           Loading the payment report…
         </p>
       ) : error ? (
         <div
           role="alert"
-          className="rounded-2xl border border-red-100 bg-red-50 p-5 text-sm text-red-800"
+          className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-800"
         >
           <p>{error}</p>
 
-          <button
-            type="button"
-            onClick={refreshReport}
-            className="mt-3 font-semibold underline"
-          >
-            Try again
-          </button>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={refreshReport}
+              className="min-h-11 font-semibold underline"
+            >
+              Try again
+            </button>
+
+            {page > 1 && (
+              <button
+                type="button"
+                onClick={() => changePage(1)}
+                className="min-h-11 font-semibold underline"
+              >
+                Return to page 1
+              </button>
+            )}
+          </div>
         </div>
       ) : payments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div className="rounded-2xl border border-dashed border-[#245747]/25 bg-white p-6 text-center">
+          <h3 className="font-heading text-base font-semibold text-[#173F35]">
             No recorded payments found
-          </h2>
+          </h3>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
             Try different filters. Unpaid charges and unresolved M-Pesa
             attempts do not appear as recorded payments.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left text-sm">
-              <caption className="sr-only">
-                Recorded payments and their details
-              </caption>
+        <ul className="space-y-3">
+          {payments.map((payment) => {
+            const expanded = expandedId === payment.id;
+            const detailsId = `payment-details-${payment.id}`;
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="px-4 py-3">Resident</th>
-                  <th scope="col" className="px-4 py-3">Room</th>
-                  <th scope="col" className="px-4 py-3">Method</th>
-                  <th scope="col" className="px-4 py-3 text-right">Amount</th>
-                  <th scope="col" className="px-4 py-3">Recorded</th>
-                  <th scope="col" className="px-4 py-3">Details</th>
-                </tr>
-              </thead>
+            return (
+              <li
+                key={payment.id}
+                className={`overflow-hidden rounded-2xl border bg-white ${
+                  expanded
+                    ? "border-[#245747]/40"
+                    : "border-[#245747]/15"
+                }`}
+              >
+                <article aria-labelledby={`payment-heading-${payment.id}`}>
+                  <div className="grid items-center gap-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                    <div className="min-w-0">
+                      <p className="text-xs text-[#78716C]">
+                        Payment #{payment.id} · Room{" "}
+                        {payment.room_number || "unavailable"}
+                      </p>
 
-              {payments.map((payment) => {
-                const expanded = expandedId === payment.id;
-
-                return (
-                  <tbody
-                    key={payment.id}
-                    className="border-b border-slate-100 last:border-b-0"
-                  >
-                    <tr className="hover:bg-slate-50/70">
-                      <th
-                        scope="row"
-                        className="px-4 py-3 font-medium text-slate-900"
+                      <h3
+                        id={`payment-heading-${payment.id}`}
+                        title={payment.resident_name || ""}
+                        className="mt-1 truncate font-heading text-base font-semibold text-[#173F35]"
                       >
-                        <span
-                          className="block max-w-44 truncate"
-                          title={payment.resident_name}
-                        >
-                          {payment.resident_name || "Name unavailable"}
-                        </span>
-                      </th>
+                        {payment.resident_name || "Name unavailable"}
+                      </h3>
 
-                      <td className="px-4 py-3 text-slate-600">
-                        {payment.room_number}
-                      </td>
+                      <p className="mt-2 text-xs leading-5 text-[#78716C]">
+                        Recorded: {formatDate(payment.created_at)} · Nairobi
+                      </p>
+                    </div>
 
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {methodLabels[payment.method] || payment.method}
-                        </span>
-                      </td>
-
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
+                    <div className="flex flex-wrap items-center justify-between gap-3 md:flex-col md:items-end md:gap-2">
+                      <p className="text-base font-semibold tabular-nums text-[#173F35]">
                         {formatMoney(payment.amount)}
-                      </td>
+                      </p>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
-                        {formatDate(payment.created_at)}
-                      </td>
+                      <MethodBadge method={payment.method} />
+                    </div>
 
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          aria-expanded={expanded}
-                          aria-controls={`payment-details-${payment.id}`}
-                          aria-label={`${
-                            expanded ? "Hide" : "View"
-                          } details for payment ${payment.id}`}
-                          onClick={() =>
-                            setExpandedId(expanded ? null : payment.id)
-                          }
-                          className="whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                        >
-                          {expanded ? "Hide details" : "View details"}
-                        </button>
-                      </td>
-                    </tr>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-controls={detailsId}
+                      aria-label={`${
+                        expanded ? "Hide" : "View"
+                      } details for payment ${payment.id}`}
+                      onClick={() =>
+                        setExpandedId((current) =>
+                          current === payment.id ? null : payment.id,
+                        )
+                      }
+                      className={`${secondaryButton} w-full md:w-auto`}
+                    >
+                      {expanded ? "Hide details" : "View details"}
+                      <span aria-hidden="true">
+                        {expanded ? "−" : "+"}
+                      </span>
+                    </button>
+                  </div>
 
-                    <tr hidden={!expanded}>
-                      <td colSpan={6} className="bg-slate-50 p-4">
-                        <div id={`payment-details-${payment.id}`}>
-                          <h2 className="text-sm font-semibold text-slate-900">
-                            Payment #{payment.id}
-                          </h2>
+                  {/* Full payment details */}
+                  <div
+                    id={detailsId}
+                    hidden={!expanded}
+                    className="border-t border-[#245747]/10 bg-[#FAF7F2] p-4 sm:p-5"
+                  >
+                    <h4 className="text-sm font-semibold text-[#173F35]">
+                      Payment details
+                    </h4>
 
-                          <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-2">
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                Resident
-                              </dt>
-                              <dd className="mt-1 break-words font-medium text-slate-800">
-                                {payment.resident_name || "Name unavailable"}
-                              </dd>
-                            </div>
+                    <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="min-w-0">
+                        <dt className="text-xs text-[#78716C]">Resident</dt>
+                        <dd className="mt-1 break-words font-medium text-[#173F35]">
+                          {payment.resident_name || "Name unavailable"}
+                        </dd>
+                      </div>
 
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                Charge number
-                              </dt>
-                              <dd className="mt-1 font-medium text-slate-800">
-                                #{payment.charge}
-                              </dd>
-                            </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-[#78716C]">Room</dt>
+                        <dd className="mt-1 break-words font-medium text-[#173F35]">
+                          {payment.room_number || "Unavailable"}
+                        </dd>
+                      </div>
 
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                Billing month
-                              </dt>
-                              <dd className="mt-1 font-medium text-slate-800">
-                                {payment.billing_month?.slice(0, 7) || "—"}
-                              </dd>
-                            </div>
+                      <div>
+                        <dt className="text-xs text-[#78716C]">
+                          Charge number
+                        </dt>
+                        <dd className="mt-1 font-medium text-[#173F35]">
+                          {payment.charge != null
+                            ? `#${payment.charge}`
+                            : "Unavailable"}
+                        </dd>
+                      </div>
 
-                            <div>
-                              <dt className="text-xs text-slate-500">
-                                Recorded at — Nairobi time
-                              </dt>
-                              <dd className="mt-1 font-medium text-slate-800">
-                                {formatDate(payment.created_at)}
-                              </dd>
-                            </div>
+                      <div>
+                        <dt className="text-xs text-[#78716C]">
+                          Billing month
+                        </dt>
+                        <dd className="mt-1 font-medium text-[#173F35]">
+                          {typeof payment.billing_month === "string"
+                            ? payment.billing_month.slice(0, 7)
+                            : "Unavailable"}
+                        </dd>
+                      </div>
 
-                            <div className="sm:col-span-2">
-                              <dt className="text-xs text-slate-500">
-                                Payment reference
-                              </dt>
-                              <dd className="mt-1 break-all font-mono text-xs leading-6 text-slate-800">
-                                {payment.reference || "—"}
-                              </dd>
-                            </div>
-                          </dl>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                );
-              })}
-            </table>
-          </div>
-        </div>
+                      <div>
+                        <dt className="text-xs text-[#78716C]">Amount</dt>
+                        <dd className="mt-1 font-semibold tabular-nums text-[#173F35]">
+                          {formatMoney(payment.amount)}
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt className="text-xs text-[#78716C]">
+                          Payment method
+                        </dt>
+                        <dd className="mt-1 font-medium text-[#173F35]">
+                          {methodLabels[payment.method] ||
+                            payment.method ||
+                            "Unavailable"}
+                        </dd>
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <dt className="text-xs text-[#78716C]">
+                          Recorded at · Nairobi time
+                        </dt>
+                        <dd className="mt-1 font-medium text-[#173F35]">
+                          {formatDate(payment.created_at)}
+                        </dd>
+                      </div>
+
+                      <div className="min-w-0 border-t border-[#245747]/10 pt-4 sm:col-span-2 lg:col-span-3">
+                        <dt className="text-xs text-[#78716C]">
+                          Payment reference
+                        </dt>
+                        <dd className="mt-2 break-all rounded-lg border border-[#245747]/10 bg-white px-3 py-2 font-mono text-xs leading-6 text-[#173F35]">
+                          {payment.reference || "Unavailable"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
+      {/* Pagination */}
       {!error && (
         <nav
           aria-label="Payment report pages"
@@ -478,27 +649,28 @@ export default function PaymentReportPage() {
             type="button"
             disabled={loading || page === 1}
             onClick={() => changePage(page - 1)}
-            className="button-secondary"
+            className={secondaryButton}
           >
             Previous
           </button>
 
-          <span className="text-sm text-slate-500">Page {page}</span>
+          <span className="text-sm text-[#78716C]">Page {page}</span>
 
           <button
             type="button"
             disabled={loading || !hasNext}
             onClick={() => changePage(page + 1)}
-            className="button-secondary"
+            className={secondaryButton}
           >
             Next
           </button>
         </nav>
       )}
 
-      <p className="text-xs leading-6 text-slate-500">
-        Dates shown use Nairobi time. Date filters use the backend’s configured
-        timezone. This report lists recorded payments, not outstanding balances.
+      <p className="rounded-xl bg-[#E8EDE4]/60 px-4 py-3 text-xs leading-6 text-[#57534E]">
+        Dates shown use Nairobi time. Date filters use the backend’s
+        configured timezone. This report lists recorded payments, not
+        outstanding balances or unresolved payment attempts.
       </p>
     </section>
   );

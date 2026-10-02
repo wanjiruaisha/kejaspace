@@ -14,9 +14,33 @@ const statusOptions = [
 
 const statusStyles = {
   pending: "bg-amber-50 text-amber-800",
-  in_progress: "bg-blue-50 text-blue-800",
+  in_progress: "bg-[#F5E8DE] text-[#965038]",
   resolved: "bg-emerald-50 text-emerald-800",
 };
+
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 " +
+  "rounded-xl px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#E8EDE4]";
+
+const inputClass =
+  "mt-2 min-h-11 w-full min-w-0 rounded-xl " +
+  "border border-[#245747]/20 bg-white px-3 py-2.5 " +
+  "text-sm text-[#173F35] placeholder:text-[#78716C] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+const labelClass = "block text-sm font-semibold text-[#173F35]";
 
 function getStatusLabel(status) {
   return (
@@ -30,16 +54,24 @@ function getErrorMessage(error) {
     return error.data.detail;
   }
 
-  if (error.data && typeof error.data === "object") {
-    return Object.entries(error.data)
+  if (
+    error.data &&
+    typeof error.data === "object" &&
+    !Array.isArray(error.data)
+  ) {
+    const message = Object.entries(error.data)
       .map(([field, value]) => {
-        const message = Array.isArray(value)
+        const text = Array.isArray(value)
           ? value.join(" ")
           : String(value);
 
-        return `${field}: ${message}`;
+        return field === "non_field_errors"
+          ? text
+          : `${field.replaceAll("_", " ")}: ${text}`;
       })
       .join(" ");
+
+    if (message) return message;
   }
 
   return error.message || "Could not save the update.";
@@ -62,9 +94,10 @@ function formatDate(value) {
 function StatusBadge({ status }) {
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
-        statusStyles[status] || "bg-slate-100 text-slate-700"
-      }`}
+      className={`inline-flex whitespace-nowrap rounded-full
+        px-2.5 py-1.5 text-xs font-medium ${
+          statusStyles[status] || "bg-stone-100 text-stone-700"
+        }`}
     >
       {getStatusLabel(status)}
     </span>
@@ -92,6 +125,7 @@ export default function MaintenancePage() {
 
   const savingRef = useRef(false);
   const detailsRef = useRef(null);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,23 +172,34 @@ export default function MaintenancePage() {
   }, [page, statusFilter, retry]);
 
   useEffect(() => {
-    if (selectedRequest) {
-      detailsRef.current?.focus({ preventScroll: true });
-      detailsRef.current?.scrollIntoView({
-        block: "nearest",
-        behavior: "auto",
-      });
-    }
+    if (!selectedRequest) return;
+
+    detailsRef.current?.focus({ preventScroll: true });
+    detailsRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "auto",
+    });
   }, [selectedRequest]);
 
-  function closeDetails() {
+  function resetDetails() {
     setSelectedRequest(null);
     setEditing(false);
   }
 
-  function openDetails(request) {
+  function closeDetails() {
     if (savingRef.current) return;
 
+    resetDetails();
+
+    if (triggerRef.current?.isConnected) {
+      triggerRef.current.focus();
+    }
+  }
+
+  function openDetails(request, button) {
+    if (savingRef.current || loading) return;
+
+    triggerRef.current = button;
     setSelectedRequest(request);
     setEditing(false);
     setActionError("");
@@ -162,7 +207,7 @@ export default function MaintenancePage() {
   }
 
   function startEditing() {
-    if (!selectedRequest || savingRef.current) return;
+    if (!selectedRequest || savingRef.current || loading) return;
 
     setEditStatus(selectedRequest.status);
     setStaffNote(selectedRequest.staff_note || "");
@@ -171,14 +216,22 @@ export default function MaintenancePage() {
     setEditing(true);
   }
 
-  function refreshList() {
-    closeDetails();
+  // Can also run internally after an update.
+  function reloadRequests() {
+    resetDetails();
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
+  function handleRefresh() {
+    if (savingRef.current || loading) return;
+    reloadRequests();
+  }
+
   function changePage(nextPage) {
-    closeDetails();
+    if (savingRef.current || loading || nextPage < 1) return;
+
+    resetDetails();
     setActionError("");
     setSuccessMessage("");
     setLoading(true);
@@ -186,7 +239,9 @@ export default function MaintenancePage() {
   }
 
   function changeFilter(event) {
-    closeDetails();
+    if (savingRef.current || loading) return;
+
+    resetDetails();
     setActionError("");
     setSuccessMessage("");
     setLoading(true);
@@ -197,7 +252,19 @@ export default function MaintenancePage() {
   async function handleSave(event) {
     event.preventDefault();
 
-    if (savingRef.current || !selectedRequest || !editing) return;
+    if (
+      savingRef.current ||
+      !selectedRequest ||
+      !editing ||
+      loading
+    ) {
+      return;
+    }
+
+    if (!statusOptions.some((option) => option.value === editStatus)) {
+      setActionError("Choose a valid maintenance status.");
+      return;
+    }
 
     const requestId = selectedRequest.id;
 
@@ -223,9 +290,9 @@ export default function MaintenancePage() {
         `Maintenance request #${requestId} updated successfully.`,
       );
 
-      // The updated status may no longer match the selected filter.
+      // A changed status may no longer match the selected filter.
       setPage(1);
-      refreshList();
+      reloadRequests();
     } catch (error) {
       if ([400, 401, 403, 429].includes(error.status)) {
         setActionError(
@@ -239,7 +306,7 @@ export default function MaintenancePage() {
             "Check the request’s current status and note before editing again.",
         );
 
-        refreshList();
+        reloadRequests();
       }
     } finally {
       savingRef.current = false;
@@ -248,34 +315,42 @@ export default function MaintenancePage() {
   }
 
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Hostel management
-          </p>
-
-          <h1 className="page-title mt-2">Maintenance requests</h1>
-
-          <p className="page-description">
-            Review reported issues and keep residents informed about repairs.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={refreshList}
-          disabled={loading || saving}
-          className="button-secondary"
+    <section
+      aria-labelledby="maintenance-heading"
+      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
+    >
+      {/* Introduction */}
+      <header
+        className="rounded-2xl border border-[#245747]/10
+          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
+          to-[#DCE9DD] p-5 sm:p-6"
+      >
+        <p
+          className="text-xs font-semibold uppercase
+            tracking-[0.14em] text-[#965038]"
         >
-          Refresh
-        </button>
+          Repairs & upkeep
+        </p>
+
+        <h1
+          id="maintenance-heading"
+          className="mt-2 font-heading text-2xl
+            font-bold tracking-tight text-[#173F35]"
+        >
+          Maintenance requests
+        </h1>
+
+        <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
+          Review reported problems, track repairs and let residents
+          know what happens next.
+        </p>
       </header>
 
       {successMessage && (
         <p
           role="status"
-          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="rounded-xl border border-emerald-100
+            bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {successMessage}
         </p>
@@ -284,19 +359,25 @@ export default function MaintenancePage() {
       {actionError && (
         <p
           role="alert"
-          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-xl border border-amber-200
+            bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           {actionError}
         </p>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="w-full sm:max-w-xs">
+      {/* Filter */}
+      <div
+        className="flex flex-wrap items-end justify-between
+          gap-4 rounded-2xl border border-[#245747]/15
+          bg-white p-4 sm:p-5"
+      >
+        <div className="w-full sm:w-64">
           <label
             htmlFor="staff-maintenance-filter"
-            className="form-label"
+            className={labelClass}
           >
-            Filter by status
+            Request status
           </label>
 
           <select
@@ -304,7 +385,7 @@ export default function MaintenancePage() {
             value={statusFilter}
             onChange={changeFilter}
             disabled={loading || saving}
-            className="form-input"
+            className={inputClass}
           >
             <option value="">All statuses</option>
 
@@ -315,10 +396,24 @@ export default function MaintenancePage() {
             ))}
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={loading || saving}
+          className={secondaryButton}
+        >
+          <span aria-hidden="true">↻</span>
+          Refresh
+        </button>
       </div>
 
+      {/* Request list */}
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div
+          className="rounded-2xl border border-[#245747]/15
+            bg-white p-5"
+        >
           <LoadingMessage
             label="Loading maintenance requests…"
             compact
@@ -327,116 +422,337 @@ export default function MaintenancePage() {
       ) : listError ? (
         <div
           role="alert"
-          className="rounded-2xl bg-red-50 p-5 text-sm text-red-800"
+          className="rounded-2xl border border-red-100
+            bg-red-50 p-5 text-sm leading-6 text-red-800"
         >
           <p>{listError}</p>
 
           <button
             type="button"
-            onClick={refreshList}
+            onClick={handleRefresh}
             disabled={saving}
-            className="mt-3 font-semibold underline"
+            className="mt-2 inline-flex min-h-11 items-center
+              rounded-lg font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : requests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
-            No maintenance requests
+        <div
+          className="rounded-2xl border border-dashed
+            border-[#245747]/25 bg-white px-5 py-9 text-center"
+        >
+          <h2
+            className="font-heading text-base
+              font-semibold text-[#173F35]"
+          >
+            No maintenance requests found
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
             No requests match the selected status.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] table-fixed text-left text-sm">
-              <caption className="sr-only">
-                Maintenance requests by resident, room and status
-              </caption>
+        <div className="space-y-3">
+          {requests.map((request) => {
+            const isSelected = selectedRequest?.id === request.id;
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="w-[34%] px-4 py-3">
-                    Request
-                  </th>
-                  <th scope="col" className="w-[20%] px-4 py-3">
-                    Resident
-                  </th>
-                  <th scope="col" className="w-[12%] px-4 py-3">
-                    Room
-                  </th>
-                  <th scope="col" className="w-[17%] px-4 py-3">
-                    Status
-                  </th>
-                  <th scope="col" className="w-[17%] px-4 py-3">
-                    Details
-                  </th>
-                </tr>
-              </thead>
+            return (
+              <article
+                key={request.id}
+                aria-labelledby={`request-title-${request.id}`}
+                className={`min-w-0 rounded-2xl border p-4 sm:p-5 ${
+                  isSelected
+                    ? "border-[#245747]/40 bg-[#EDF3E8]"
+                    : "border-[#245747]/15 bg-white"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 basis-48">
+                    <p className="text-xs text-[#78716C]">
+                      Request #{request.id} · Room {request.room_number}
+                    </p>
 
-              <tbody className="divide-y divide-slate-100">
-                {requests.map((request) => (
-                  <tr
-                    key={request.id}
-                    className={
-                      selectedRequest?.id === request.id
-                        ? "bg-blue-50/60"
-                        : "hover:bg-slate-50"
-                    }
-                  >
-                    <th
-                      scope="row"
-                      className="px-4 py-3 font-medium text-slate-900"
+                    <h2
+                      id={`request-title-${request.id}`}
+                      className="mt-1 line-clamp-2 break-words
+                        font-heading text-base font-semibold
+                        leading-6 text-[#173F35]"
                     >
-                      <p className="truncate" title={request.title}>
-                        {request.title}
-                      </p>
+                      {request.title}
+                    </h2>
+                  </div>
 
-                      <p className="mt-1 text-xs font-normal text-slate-500">
-                        Request #{request.id}
-                      </p>
-                    </th>
+                  <StatusBadge status={request.status} />
+                </div>
 
-                    <td className="px-4 py-3 text-slate-600">
-                      <p
-                        className="truncate"
-                        title={request.resident_username}
+                <div
+                  className="mt-4 flex flex-wrap items-end
+                    justify-between gap-4"
+                >
+                  <dl className="flex min-w-0 flex-wrap gap-x-8 gap-y-3">
+                    <div className="min-w-0">
+                      <dt className="text-xs text-[#78716C]">
+                        Reported by
+                      </dt>
+                      <dd
+                        className="mt-1 break-words text-sm
+                          font-medium text-[#173F35]"
                       >
                         {request.resident_username || "Unavailable"}
-                      </p>
-                    </td>
+                      </dd>
+                    </div>
 
-                    <td className="px-4 py-3 text-slate-600">
-                      <p className="truncate" title={request.room_number}>
-                        {request.room_number}
-                      </p>
-                    </td>
+                    <div>
+                      <dt className="text-xs text-[#78716C]">
+                        Last updated
+                      </dt>
+                      <dd className="mt-1 text-xs leading-6 text-[#57534E]">
+                        {formatDate(request.updated_at)}
+                      </dd>
+                    </div>
+                  </dl>
 
-                    <td className="px-4 py-3">
-                      <StatusBadge status={request.status} />
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => openDetails(request)}
-                        disabled={saving}
-                        aria-label={`View details for request ${request.id}`}
-                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <button
+                    type="button"
+                    onClick={(event) =>
+                      openDetails(request, event.currentTarget)
+                    }
+                    disabled={saving}
+                    aria-label={`View details for maintenance request #${request.id}`}
+                    aria-expanded={isSelected}
+                    aria-controls={
+                      isSelected ? "maintenance-details" : undefined
+                    }
+                    className={secondaryButton}
+                  >
+                    View details
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
+      )}
+
+      {/* Details and editing */}
+      {selectedRequest && !loading && !listError && (
+        <section
+          id="maintenance-details"
+          ref={detailsRef}
+          tabIndex={-1}
+          aria-labelledby="maintenance-details-title"
+          onKeyDown={(event) => {
+            if (
+              event.key === "Escape" &&
+              !savingRef.current &&
+              !editing
+            ) {
+              event.stopPropagation();
+              closeDetails();
+            }
+          }}
+          className="min-w-0 scroll-mt-24 rounded-2xl
+            border border-[#245747]/25 bg-white p-4
+            focus-visible:outline-2 focus-visible:outline-offset-4
+            focus-visible:outline-[#245747] sm:p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#965038]">
+                Request #{selectedRequest.id}
+              </p>
+
+              <h2
+                id="maintenance-details-title"
+                className="mt-2 break-words font-heading
+                  text-lg font-semibold leading-7 text-[#173F35]"
+              >
+                {selectedRequest.title}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeDetails}
+              disabled={saving}
+              className={`${secondaryButton} shrink-0`}
+            >
+              Close
+            </button>
+          </div>
+
+          <dl
+            className="mt-5 grid gap-4 rounded-xl
+              bg-[#FAF7F2] p-4 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <div className="min-w-0">
+              <dt className="text-xs text-[#78716C]">Resident</dt>
+              <dd
+                className="mt-1 break-words text-sm
+                  font-medium text-[#173F35]"
+              >
+                {selectedRequest.resident_username || "Unavailable"}
+              </dd>
+            </div>
+
+            <div className="min-w-0">
+              <dt className="text-xs text-[#78716C]">Room</dt>
+              <dd
+                className="mt-1 break-words text-sm
+                  font-medium text-[#173F35]"
+              >
+                {selectedRequest.room_number}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs text-[#78716C]">Status</dt>
+              <dd className="mt-1">
+                <StatusBadge status={selectedRequest.status} />
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs text-[#78716C]">Last updated</dt>
+              <dd className="mt-1 text-xs leading-6 text-[#57534E]">
+                {formatDate(selectedRequest.updated_at)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-5 border-t border-[#245747]/10 pt-4">
+            <h3 className="text-sm font-semibold text-[#173F35]">
+              Reported issue
+            </h3>
+
+            <p
+              className="mt-2 whitespace-pre-wrap break-words
+                text-sm leading-7 text-[#57534E]"
+            >
+              {selectedRequest.description || "No description provided."}
+            </p>
+
+            <p className="mt-3 text-xs leading-5 text-[#78716C]">
+              Reported: {formatDate(selectedRequest.created_at)}
+            </p>
+          </div>
+
+          {editing ? (
+            <form
+              onSubmit={handleSave}
+              aria-busy={saving}
+              className="mt-5 rounded-xl border
+                border-[#245747]/15 bg-[#FAF7F2] p-4"
+            >
+              <h3
+                className="font-heading text-base
+                  font-semibold text-[#173F35]"
+              >
+                Update request
+              </h3>
+
+              <fieldset
+                disabled={saving}
+                className="mt-4 min-w-0 space-y-4"
+              >
+                <legend className="sr-only">
+                  Maintenance update details
+                </legend>
+
+                <div className="max-w-xs">
+                  <label
+                    htmlFor="maintenance-edit-status"
+                    className={labelClass}
+                  >
+                    Status
+                  </label>
+
+                  <select
+                    id="maintenance-edit-status"
+                    value={editStatus}
+                    onChange={(event) => setEditStatus(event.target.value)}
+                    className={inputClass}
+                  >
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="maintenance-staff-note"
+                    className={labelClass}
+                  >
+                    Note to resident
+                  </label>
+
+                  <textarea
+                    id="maintenance-staff-note"
+                    value={staffNote}
+                    onChange={(event) => setStaffNote(event.target.value)}
+                    rows={4}
+                    aria-describedby="maintenance-note-help"
+                    placeholder="For example: The plumber is scheduled for tomorrow morning."
+                    className={`${inputClass} resize-y`}
+                  />
+
+                  <p
+                    id="maintenance-note-help"
+                    className="mt-2 text-xs leading-5 text-[#78716C]"
+                  >
+                    The resident can read this note. Include a clear
+                    update about the repair or next step.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" className={primaryButton}>
+                    {saving ? "Saving…" : "Save update"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(false);
+                      setActionError("");
+                    }}
+                    className={secondaryButton}
+                  >
+                    Cancel editing
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          ) : (
+            <div className="mt-5 border-t border-[#245747]/10 pt-4">
+              <h3 className="text-sm font-semibold text-[#173F35]">
+                Current staff note
+              </h3>
+
+              <p
+                className="mt-2 whitespace-pre-wrap break-words
+                  text-sm leading-7 text-[#57534E]"
+              >
+                {selectedRequest.staff_note || "No staff note added yet."}
+              </p>
+
+              <button
+                type="button"
+                onClick={startEditing}
+                disabled={saving}
+                className={`${primaryButton} mt-4`}
+              >
+                Update request
+              </button>
+            </div>
+          )}
+        </section>
       )}
 
       <nav
@@ -447,199 +763,26 @@ export default function MaintenancePage() {
           type="button"
           disabled={loading || saving || page === 1}
           onClick={() => changePage(page - 1)}
-          className="button-secondary"
+          className={secondaryButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-500">Page {page}</span>
+        <span className="text-sm text-[#57534E]">Page {page}</span>
 
         <button
           type="button"
           disabled={loading || saving || Boolean(listError) || !hasNext}
           onClick={() => changePage(page + 1)}
-          className="button-secondary"
+          className={secondaryButton}
         >
           Next
         </button>
       </nav>
 
-      {selectedRequest && !loading && !listError && (
-        <section
-          ref={detailsRef}
-          tabIndex={-1}
-          aria-labelledby="maintenance-details-title"
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500">
-                Request #{selectedRequest.id}
-              </p>
-
-              <h2
-                id="maintenance-details-title"
-                className="mt-2 break-words font-heading text-base font-semibold text-slate-900"
-              >
-                {selectedRequest.title}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={closeDetails}
-              disabled={saving}
-              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-            >
-              Close
-            </button>
-          </div>
-
-          <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div className="min-w-0">
-              <dt className="text-xs text-slate-500">Resident</dt>
-              <dd className="mt-1 break-words font-medium text-slate-900">
-                {selectedRequest.resident_username || "Unavailable"}
-              </dd>
-            </div>
-
-            <div className="min-w-0">
-              <dt className="text-xs text-slate-500">Room</dt>
-              <dd className="mt-1 break-words font-medium text-slate-900">
-                {selectedRequest.room_number}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs text-slate-500">Status</dt>
-              <dd className="mt-1">
-                <StatusBadge status={selectedRequest.status} />
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs text-slate-500">
-                Last updated · Nairobi
-              </dt>
-              <dd className="mt-1 text-sm text-slate-700">
-                {formatDate(selectedRequest.updated_at)}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="mt-5 border-t border-slate-100 pt-5">
-            <h3 className="text-sm font-semibold text-slate-900">
-              Reported issue
-            </h3>
-
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
-              {selectedRequest.description || "No description provided."}
-            </p>
-          </div>
-
-          {editing ? (
-            <form
-              onSubmit={handleSave}
-              className="mt-5 space-y-4 border-t border-slate-100 pt-5"
-            >
-              <h3 className="text-sm font-semibold text-slate-900">
-                Update request
-              </h3>
-
-              <div className="max-w-xs">
-                <label
-                  htmlFor="maintenance-edit-status"
-                  className="form-label"
-                >
-                  Status
-                </label>
-
-                <select
-                  id="maintenance-edit-status"
-                  value={editStatus}
-                  onChange={(event) => setEditStatus(event.target.value)}
-                  disabled={saving}
-                  className="form-input"
-                >
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="maintenance-staff-note"
-                  className="form-label"
-                >
-                  Note to resident
-                </label>
-
-                <textarea
-                  id="maintenance-staff-note"
-                  value={staffNote}
-                  onChange={(event) => setStaffNote(event.target.value)}
-                  rows={4}
-                  disabled={saving}
-                  aria-describedby="maintenance-note-help"
-                  placeholder="For example: A plumber will visit tomorrow morning."
-                  className="form-input resize-y"
-                />
-
-                <p
-                  id="maintenance-note-help"
-                  className="mt-2 text-xs text-slate-500"
-                >
-                  The resident can read this note.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="button-primary"
-                >
-                  {saving ? "Saving…" : "Save update"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditing(false);
-                    setActionError("");
-                  }}
-                  disabled={saving}
-                  className="button-secondary"
-                >
-                  Cancel editing
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="mt-5 border-t border-slate-100 pt-5">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Current staff note
-              </h3>
-
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
-                {selectedRequest.staff_note || "No staff note added yet."}
-              </p>
-
-              <button
-                type="button"
-                onClick={startEditing}
-                disabled={saving}
-                className="button-primary mt-5"
-              >
-                Update request
-              </button>
-            </div>
-          )}
-        </section>
-      )}
+      <p className="text-xs leading-5 text-[#78716C]">
+        All times are shown in Nairobi time.
+      </p>
     </section>
   );
 }

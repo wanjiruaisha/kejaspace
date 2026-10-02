@@ -22,8 +22,35 @@ const moneyFormatter = new Intl.NumberFormat("en-KE", {
   maximumFractionDigits: 2,
 });
 
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#EDF3E8]";
+
+const dangerButton =
+  `${buttonBase} border border-red-200 bg-white ` +
+  "text-red-700 hover:bg-red-50";
+
+const inputStyle =
+  "mt-2 min-h-11 w-full rounded-xl border border-[#245747]/20 " +
+  "bg-white px-3.5 py-2.5 text-sm text-[#173F35] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:bg-stone-100 disabled:opacity-60";
+
+const labelStyle = "block text-sm font-semibold text-[#173F35]";
+
 function getErrorMessage(error) {
-  if (error.data && typeof error.data === "object") {
+  if (error?.data && typeof error.data === "object") {
     const messages = Object.entries(error.data).map(([field, value]) => {
       const text = Array.isArray(value) ? value.join(" ") : String(value);
 
@@ -35,16 +62,24 @@ function getErrorMessage(error) {
     if (messages.length > 0) return messages.join(" ");
   }
 
-  return error.message || "Something went wrong. Please try again.";
+  return error?.message || "Something went wrong. Please try again.";
+}
+
+function formatMoney(value) {
+  const amount = Number(value);
+
+  return value == null || !Number.isFinite(amount)
+    ? "Unavailable"
+    : moneyFormatter.format(amount);
 }
 
 function StatusBadge({ active }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
         active
           ? "bg-emerald-50 text-emerald-800"
-          : "bg-slate-100 text-slate-600"
+          : "bg-stone-100 text-stone-600"
       }`}
     >
       {active ? "Active" : "Inactive"}
@@ -73,6 +108,7 @@ export default function ManageRoomsPage() {
   const [reviewReloaded, setReviewReloaded] = useState(false);
 
   const panelRef = useRef(null);
+  const triggerRef = useRef(null);
   const mutationInProgress = useRef(false);
 
   useEffect(() => {
@@ -113,22 +149,28 @@ export default function ManageRoomsPage() {
   useEffect(() => {
     if (!panel) return;
 
-    panelRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-
     panelRef.current?.focus({ preventScroll: true });
+    panelRef.current?.scrollIntoView({ block: "nearest" });
   }, [panel, selectedRoom?.id]);
 
-  function closePanel() {
+  function resetPanel() {
     setPanel(null);
     setSelectedRoom(null);
     setConfirmDelete(false);
     setForm({ ...emptyForm });
   }
 
-  function openCreate() {
+  function closePanel() {
+    if (mutationInProgress.current) return;
+
+    resetPanel();
+    triggerRef.current?.focus();
+  }
+
+  function openCreate(event) {
+    if (mutationInProgress.current || loading || needsReview) return;
+
+    triggerRef.current = event.currentTarget;
     setSelectedRoom(null);
     setForm({ ...emptyForm });
     setConfirmDelete(false);
@@ -137,14 +179,28 @@ export default function ManageRoomsPage() {
     setPanel("create");
   }
 
-  function openRoom(room) {
+  function openRoom(room, event) {
+    if (mutationInProgress.current || loading) return;
+
+    triggerRef.current = event.currentTarget;
     setSelectedRoom(room);
     setConfirmDelete(false);
+    setActionMessage("");
+
+    if (!needsReview) setActionError("");
+
     setPanel("view");
   }
 
   function startEditing() {
-    if (!selectedRoom) return;
+    if (
+      !selectedRoom ||
+      mutationInProgress.current ||
+      loading ||
+      needsReview
+    ) {
+      return;
+    }
 
     setForm({
       room_number: selectedRoom.room_number,
@@ -169,15 +225,34 @@ export default function ManageRoomsPage() {
     }));
   }
 
-  function refreshRooms() {
-    closePanel();
+  function reloadRooms() {
+    resetPanel();
+    setLoading(true);
     setReviewReloaded(false);
     setReload((value) => value + 1);
   }
 
+  function refreshRooms() {
+    if (mutationInProgress.current || loading) return;
+    reloadRooms();
+  }
+
+  function changePage(nextPage) {
+    if (mutationInProgress.current || loading || nextPage < 1) return;
+
+    resetPanel();
+    setLoading(true);
+    setReviewReloaded(false);
+    setPage(nextPage);
+  }
+
   function handleMutationError(err) {
-    if ([400, 401, 403, 404, 409, 429].includes(err.status)) {
-      setActionError(getErrorMessage(err));
+    if ([400, 401, 403, 404, 409, 429].includes(err?.status)) {
+      setActionError(
+        err.status === 429
+          ? "Too many requests. Please wait before trying again."
+          : getErrorMessage(err),
+      );
       return;
     }
 
@@ -191,7 +266,14 @@ export default function ManageRoomsPage() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (mutationInProgress.current || needsReview) return;
+    if (
+      mutationInProgress.current ||
+      needsReview ||
+      loading ||
+      !["create", "edit"].includes(panel)
+    ) {
+      return;
+    }
 
     setActionError("");
     setActionMessage("");
@@ -199,23 +281,30 @@ export default function ManageRoomsPage() {
     const roomNumber = form.room_number.trim();
     const capacity = Number(form.capacity);
     const price = String(form.monthly_price).trim();
+    const isEditing = panel === "edit";
 
     if (!roomNumber) {
       setActionError("Enter a room number.");
       return;
     }
 
-    if (!Number.isInteger(capacity) || capacity < 1) {
+    if (!Number.isSafeInteger(capacity) || capacity < 1) {
       setActionError("Capacity must be a positive whole number.");
       return;
     }
 
-    if (!/^\d+(\.\d{1,2})?$/.test(price) || Number(price) <= 0) {
+    if (
+      !/^\d+(\.\d{1,2})?$/.test(price) ||
+      !Number.isFinite(Number(price)) ||
+      Number(price) <= 0
+    ) {
       setActionError(
         "Enter a positive rent amount with up to two decimal places.",
       );
       return;
     }
+
+    if (isEditing && !selectedRoom) return;
 
     const payload = {
       room_number: roomNumber,
@@ -224,11 +313,8 @@ export default function ManageRoomsPage() {
       is_active: form.is_active,
     };
 
-    const isEditing = panel === "edit";
-
-    if (!isEditing) {
-      payload.capacity = capacity;
-    }
+    // Capacity stays fixed when editing an existing room.
+    if (!isEditing) payload.capacity = capacity;
 
     mutationInProgress.current = true;
     setBusy(true);
@@ -240,13 +326,12 @@ export default function ManageRoomsPage() {
       } else {
         await createRoom(payload);
         setActionMessage(
-          "Room created successfully. Rooms are ordered by room number and may appear on another page.",
+          "Room created successfully. It may appear on another page in the room list.",
         );
         setPage(1);
       }
 
-      closePanel();
-      setReload((value) => value + 1);
+      reloadRooms();
     } catch (err) {
       handleMutationError(err);
     } finally {
@@ -260,7 +345,8 @@ export default function ManageRoomsPage() {
       !selectedRoom ||
       !confirmDelete ||
       mutationInProgress.current ||
-      needsReview
+      needsReview ||
+      loading
     ) {
       return;
     }
@@ -274,13 +360,12 @@ export default function ManageRoomsPage() {
       await deleteRoom(selectedRoom.id);
 
       setActionMessage(`Room ${selectedRoom.room_number} deleted.`);
-      closePanel();
 
       if (rooms.length === 1 && page > 1) {
         setPage((value) => value - 1);
-      } else {
-        setReload((value) => value + 1);
       }
+
+      reloadRooms();
     } catch (err) {
       setConfirmDelete(false);
       handleMutationError(err);
@@ -290,43 +375,54 @@ export default function ManageRoomsPage() {
     }
   }
 
-  const changesDisabled = busy || needsReview;
+  const changesDisabled = loading || busy || needsReview;
 
   return (
-    <section className="min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="page-title">Manage rooms</h1>
-          <p className="page-description">
-            Manage room listings, monthly rent, and availability for allocation.
-          </p>
-        </div>
+    <section className="mx-auto w-full min-w-0 max-w-6xl">
+      {/* Page header */}
+      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+              Administration
+            </p>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={refreshRooms}
-            disabled={loading || busy}
-            className="button-secondary"
-          >
-            Refresh
-          </button>
+            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+              Manage rooms
+            </h1>
 
-          <button
-            type="button"
-            onClick={openCreate}
-            disabled={changesDisabled}
-            className="button-primary"
-          >
-            Add room
-          </button>
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Keep room information, monthly rent and listing status up to date.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={refreshRooms}
+              disabled={loading || busy}
+              className={secondaryButton}
+            >
+              Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={openCreate}
+              disabled={changesDisabled}
+              className={primaryButton}
+            >
+              <span aria-hidden="true">+</span>
+              Add room
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {actionMessage && (
         <p
           role="status"
-          className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {actionMessage}
         </p>
@@ -334,18 +430,19 @@ export default function ManageRoomsPage() {
 
       {actionError && (
         <div
+          id="room-action-error"
           role="alert"
-          className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
           {needsReview && (
-            <div className="mt-3 flex flex-wrap gap-4">
+            <div className="mt-3 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={refreshRooms}
                 disabled={loading || busy}
-                className="font-semibold underline disabled:opacity-50"
+                className={secondaryButton}
               >
                 Refresh rooms
               </button>
@@ -360,7 +457,7 @@ export default function ManageRoomsPage() {
                   setActionError("");
                   closePanel();
                 }}
-                className="font-semibold underline disabled:opacity-50"
+                className={secondaryButton}
               >
                 I have checked the room list
               </button>
@@ -369,128 +466,121 @@ export default function ManageRoomsPage() {
         </div>
       )}
 
+      {/* Compact room list */}
       <div className="mt-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
+            Room listings
+          </h2>
+
+          <p className="text-xs text-[#78716C]">
+            Select a room to view or edit its details.
+          </p>
+        </div>
+
         {loading ? (
-          <p role="status" className="py-6 text-sm text-slate-600">
+          <p role="status" className="py-8 text-sm text-[#57534E]">
             Loading rooms…
           </p>
         ) : error ? (
           <div
             role="alert"
-            className="rounded-xl bg-red-50 p-4 text-sm text-red-800"
+            className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-800"
           >
             <p>{error}</p>
 
-            <button
-              type="button"
-              onClick={refreshRooms}
-              className="mt-3 font-semibold underline"
-            >
-              Try again
-            </button>
-
-            {page > 1 && (
+            <div className="mt-3 flex flex-wrap gap-4">
               <button
                 type="button"
-                onClick={() => {
-                  closePanel();
-                  setPage(1);
-                }}
-                className="ml-4 mt-3 font-semibold underline"
+                onClick={refreshRooms}
+                className="min-h-11 font-semibold underline"
               >
-                Return to page 1
+                Try again
               </button>
-            )}
+
+              {page > 1 && (
+                <button
+                  type="button"
+                  onClick={() => changePage(1)}
+                  className="min-h-11 font-semibold underline"
+                >
+                  Return to page 1
+                </button>
+              )}
+            </div>
           </div>
         ) : rooms.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
-            <h2 className="section-title">No rooms on this page</h2>
-            <p className="card-description">
-              Use “Add room” to create a room.
+          <div className="rounded-2xl border border-dashed border-[#245747]/25 bg-white p-6 text-center">
+            <h3 className="font-heading text-base font-semibold text-[#173F35]">
+              No rooms on this page
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Use Add room to create a listing.
             </p>
           </div>
         ) : (
-          <div
-            role="region"
-            aria-label="Rooms table"
-            tabIndex={0}
-            className="max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white"
-          >
-            <table className="w-full min-w-[620px] table-fixed text-left text-sm">
-              <caption className="sr-only">
-                Hostel rooms, capacity, monthly rent, and listing status
-              </caption>
+          <ul className="space-y-3">
+            {rooms.map((room) => (
+              <li
+                key={room.id}
+                className={`rounded-2xl border p-4 transition-colors sm:p-5 ${
+                  selectedRoom?.id === room.id
+                    ? "border-[#245747]/40 bg-[#EDF3E8]"
+                    : "border-[#245747]/15 bg-white hover:border-[#245747]/30"
+                }`}
+              >
+                <div className="grid items-center gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="break-words font-heading text-base font-semibold text-[#173F35]">
+                        Room {room.room_number}
+                      </h3>
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th scope="col" className="w-[18%] px-4 py-3 font-semibold">
-                    Room
-                  </th>
-                  <th scope="col" className="w-[14%] px-4 py-3 font-semibold">
-                    Capacity
-                  </th>
-                  <th scope="col" className="w-[26%] px-4 py-3 font-semibold">
-                    Monthly rent
-                  </th>
-                  <th scope="col" className="w-[18%] px-4 py-3 font-semibold">
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="w-[24%] px-4 py-3 text-right font-semibold"
-                  >
-                    Details
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {rooms.map((room) => (
-                  <tr
-                    key={room.id}
-                    className={
-                      selectedRoom?.id === room.id
-                        ? "bg-blue-50/60"
-                        : "hover:bg-slate-50"
-                    }
-                  >
-                    <th
-                      scope="row"
-                      className="px-4 py-3 font-semibold text-slate-900"
-                    >
-                      <span className="block truncate" title={room.room_number}>
-                        {room.room_number}
-                      </span>
-                    </th>
-
-                    <td className="px-4 py-3 text-slate-600">
-                      {room.capacity}
-                    </td>
-
-                    <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">
-                      {moneyFormatter.format(Number(room.monthly_price))}
-                    </td>
-
-                    <td className="px-4 py-3">
                       <StatusBadge active={room.is_active} />
-                    </td>
+                    </div>
 
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openRoom(room)}
-                        disabled={busy}
-                        aria-label={`View details for room ${room.room_number}`}
-                        className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <p className="mt-2 text-xs text-[#78716C]">
+                      Room record #{room.id}
+                    </p>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <dt className="text-xs text-[#78716C]">Capacity</dt>
+                      <dd className="mt-1 font-medium text-[#173F35]">
+                        {room.capacity}{" "}
+                        {Number(room.capacity) === 1 ? "resident" : "residents"}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="text-xs text-[#78716C]">
+                        Rent per resident
+                      </dt>
+                      <dd className="mt-1 font-semibold tabular-nums text-[#173F35]">
+                        {formatMoney(room.monthly_price)}
+                      </dd>
+                      <dd className="mt-0.5 text-xs text-[#78716C]">
+                        Per month
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <button
+                    type="button"
+                    onClick={(event) => openRoom(room, event)}
+                    disabled={busy}
+                    aria-label={`View details for room ${room.room_number}`}
+                    className={`${secondaryButton} w-full md:w-auto`}
+                  >
+                    View details
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -501,51 +591,65 @@ export default function ManageRoomsPage() {
         <button
           type="button"
           disabled={loading || busy || page === 1}
-          onClick={() => {
-            closePanel();
-            setPage((value) => value - 1);
-          }}
-          className="button-secondary"
+          onClick={() => changePage(page - 1)}
+          className={secondaryButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-500">Page {page}</span>
+        <span className="text-sm text-[#78716C]">Page {page}</span>
 
         <button
           type="button"
           disabled={loading || busy || Boolean(error) || !hasNext}
-          onClick={() => {
-            closePanel();
-            setPage((value) => value + 1);
-          }}
-          className="button-secondary"
+          onClick={() => changePage(page + 1)}
+          className={secondaryButton}
         >
           Next
         </button>
       </nav>
 
+      {/* Details and editing panel */}
       {panel && (
         <section
           ref={panelRef}
           tabIndex={-1}
           aria-labelledby="room-panel-title"
-          className="mt-6 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+          onKeyDown={(event) => {
+            if (
+              event.key === "Escape" &&
+              panel === "view" &&
+              !confirmDelete &&
+              !mutationInProgress.current
+            ) {
+              closePanel();
+            }
+          }}
+          className="mt-6 scroll-mt-24 rounded-2xl border border-[#245747]/20 bg-white p-4 focus-visible:outline-2 focus-visible:outline-[#245747] sm:p-6"
         >
           <div className="flex items-start justify-between gap-4">
-            <h2 id="room-panel-title" className="section-title">
-              {panel === "create"
-                ? "Add room"
-                : panel === "edit"
-                  ? `Edit room ${selectedRoom.room_number}`
-                  : `Room ${selectedRoom.room_number}`}
-            </h2>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#965038]">
+                {panel === "create" ? "New listing" : "Room information"}
+              </p>
+
+              <h2
+                id="room-panel-title"
+                className="mt-2 break-words font-heading text-lg font-semibold text-[#173F35]"
+              >
+                {panel === "create"
+                  ? "Add a room"
+                  : panel === "edit"
+                    ? `Edit room ${selectedRoom.room_number}`
+                    : `Room ${selectedRoom.room_number}`}
+              </h2>
+            </div>
 
             <button
               type="button"
               onClick={closePanel}
               disabled={busy}
-              className="button-secondary"
+              className={secondaryButton}
             >
               Close
             </button>
@@ -553,114 +657,137 @@ export default function ManageRoomsPage() {
 
           {panel === "view" ? (
             <>
-              <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
+              <dl className="mt-5 grid gap-5 rounded-xl bg-[#FAF7F2] p-4 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-slate-500">Capacity</dt>
-                  <dd className="mt-1 font-semibold">
-                    {selectedRoom.capacity} residents
+                  <dt className="text-xs text-[#78716C]">Capacity</dt>
+                  <dd className="mt-2 font-semibold text-[#173F35]">
+                    {selectedRoom.capacity}{" "}
+                    {Number(selectedRoom.capacity) === 1
+                      ? "resident"
+                      : "residents"}
                   </dd>
                 </div>
 
                 <div>
-                  <dt className="text-slate-500">Monthly rent per resident</dt>
-                  <dd className="mt-1 font-semibold">
-                    {moneyFormatter.format(Number(selectedRoom.monthly_price))}
+                  <dt className="text-xs text-[#78716C]">
+                    Monthly rent per resident
+                  </dt>
+                  <dd className="mt-2 font-semibold tabular-nums text-[#173F35]">
+                    {formatMoney(selectedRoom.monthly_price)}
                   </dd>
                 </div>
 
                 <div>
-                  <dt className="mb-1 text-slate-500">Listing status</dt>
+                  <dt className="mb-2 text-xs text-[#78716C]">
+                    Listing status
+                  </dt>
                   <dd>
                     <StatusBadge active={selectedRoom.is_active} />
                   </dd>
                 </div>
               </dl>
 
-              <h3 className="mt-5 text-sm font-semibold text-slate-900">
+              <h3 className="mt-5 text-sm font-semibold text-[#173F35]">
                 Description
               </h3>
-              <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-600">
+
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[#57534E]">
                 {selectedRoom.description || "No description added."}
               </p>
 
-              <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={startEditing}
-                  disabled={changesDisabled}
-                  className="button-primary"
-                >
-                  Edit room
-                </button>
+              {!confirmDelete ? (
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-[#245747]/10 pt-4">
+                  <button
+                    type="button"
+                    onClick={startEditing}
+                    disabled={changesDisabled}
+                    className={primaryButton}
+                  >
+                    Edit room
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={changesDisabled}
-                  className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                >
-                  Delete room
-                </button>
-              </div>
-
-              {confirmDelete && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={changesDisabled}
+                    className={dangerButton}
+                  >
+                    Delete room
+                  </button>
+                </div>
+              ) : (
                 <div
-                  role="alert"
-                  className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-900"
+                  role="group"
+                  aria-labelledby="delete-room-heading"
+                  aria-busy={busy}
+                  className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"
                 >
-                  <p className="font-semibold">
+                  <h3 id="delete-room-heading" className="font-semibold">
                     Delete room {selectedRoom.room_number} permanently?
-                  </p>
+                  </h3>
+
                   <p className="mt-2 leading-6">
                     Rooms with protected related records cannot be deleted.
                     You can edit the room and deactivate it instead.
                   </p>
 
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={changesDisabled}
-                      className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      {busy ? "Deleting…" : "Confirm delete"}
-                    </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(false)}
                       disabled={busy}
-                      className="button-secondary"
+                      className={secondaryButton}
                     >
                       Keep room
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={changesDisabled}
+                      className={`${buttonBase} bg-red-700 text-white hover:bg-red-800`}
+                    >
+                      {busy ? "Deleting…" : "Confirm delete"}
                     </button>
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-5">
+            <form
+              onSubmit={handleSubmit}
+              aria-busy={busy}
+              aria-describedby={actionError ? "room-action-error" : undefined}
+              className="mt-5"
+            >
               <fieldset
                 disabled={changesDisabled}
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
               >
+                <legend className="sr-only">Room details</legend>
+
                 <div>
-                  <label htmlFor="room-number" className="form-label">
+                  <label htmlFor="room-number" className={labelStyle}>
                     Room number
                   </label>
+
                   <input
                     id="room-number"
                     name="room_number"
+                    type="text"
                     required
                     value={form.room_number}
                     onChange={handleChange}
-                    className="form-input"
+                    placeholder="For example, A105"
+                    className={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="room-capacity" className="form-label">
+                  <label htmlFor="room-capacity" className={labelStyle}>
                     Capacity
                   </label>
+
                   <input
                     id="room-capacity"
                     name="capacity"
@@ -671,19 +798,27 @@ export default function ManageRoomsPage() {
                     disabled={panel === "edit"}
                     value={form.capacity}
                     onChange={handleChange}
-                    className="form-input disabled:bg-slate-100"
+                    aria-describedby={
+                      panel === "edit" ? "capacity-help" : undefined
+                    }
+                    className={inputStyle}
                   />
+
                   {panel === "edit" && (
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p
+                      id="capacity-help"
+                      className="mt-2 text-xs leading-5 text-[#78716C]"
+                    >
                       Capacity is fixed after creation.
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="room-price" className="form-label">
+                  <label htmlFor="room-price" className={labelStyle}>
                     Monthly rent per resident (KES)
                   </label>
+
                   <input
                     id="room-price"
                     name="monthly_price"
@@ -693,43 +828,54 @@ export default function ManageRoomsPage() {
                     required
                     value={form.monthly_price}
                     onChange={handleChange}
-                    className="form-input"
+                    placeholder="For example, 8500"
+                    className={inputStyle}
                   />
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label htmlFor="room-description" className="form-label">
+                  <label htmlFor="room-description" className={labelStyle}>
                     Description
                   </label>
+
                   <textarea
                     id="room-description"
                     name="description"
-                    rows={3}
+                    rows={4}
                     value={form.description}
                     onChange={handleChange}
-                    className="form-input"
+                    placeholder="Describe the room and its facilities."
+                    className={`${inputStyle} resize-y leading-6`}
                   />
                 </div>
 
-                <label className="flex items-start gap-3 sm:col-span-2 lg:col-span-3">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-[#FAF7F2] p-4 sm:col-span-2 lg:col-span-3">
                   <input
                     type="checkbox"
                     name="is_active"
                     checked={form.is_active}
                     onChange={handleChange}
-                    className="mt-1 size-4 accent-blue-700"
+                    className="mt-1 size-4 shrink-0 accent-[#245747]"
                   />
+
                   <span>
-                    <span className="text-sm font-medium">Active room</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    <span className="text-sm font-semibold text-[#173F35]">
+                      Active room
+                    </span>
+
+                    <span className="mt-1 block text-xs leading-5 text-[#57534E]">
                       Show this room in the public listing. Deactivating it
                       does not check out existing residents.
                     </span>
                   </span>
                 </label>
 
-                <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
-                  <button type="submit" className="button-primary">
+                <div className="flex flex-wrap gap-2 border-t border-[#245747]/10 pt-4 sm:col-span-2 lg:col-span-3">
+                  <button
+                    type="submit"
+                    disabled={changesDisabled}
+                    className={primaryButton}
+                  >
                     {busy
                       ? "Saving…"
                       : panel === "edit"
@@ -742,11 +888,12 @@ export default function ManageRoomsPage() {
                     onClick={() => {
                       if (panel === "edit") {
                         setPanel("view");
+                        setActionError("");
                       } else {
                         closePanel();
                       }
                     }}
-                    className="button-secondary"
+                    className={secondaryButton}
                   >
                     Cancel
                   </button>

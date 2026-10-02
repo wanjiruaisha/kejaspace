@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   listStaffApplications,
@@ -12,8 +12,64 @@ const statusStyles = {
   pending: "bg-amber-50 text-amber-800",
   approved: "bg-emerald-50 text-emerald-800",
   rejected: "bg-red-50 text-red-800",
-  cancelled: "bg-slate-100 text-slate-600",
+  cancelled: "bg-stone-100 text-stone-600",
 };
+
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 " +
+  "rounded-xl px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#E8EDE4]";
+
+const rejectButton =
+  `${buttonBase} border border-red-200 bg-white ` +
+  "text-red-700 hover:bg-red-50";
+
+function formatTimestamp(value) {
+  if (!value) return "Not recorded";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  return new Intl.DateTimeFormat("en-KE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Africa/Nairobi",
+  }).format(date);
+}
+
+function getErrorMessage(error) {
+  if (
+    error.data &&
+    typeof error.data === "object" &&
+    !Array.isArray(error.data)
+  ) {
+    const message = Object.entries(error.data)
+      .map(([field, messages]) => {
+        const text = Array.isArray(messages)
+          ? messages.join(" ")
+          : String(messages);
+
+        return field === "detail" || field === "non_field_errors"
+          ? text
+          : `${field.replaceAll("_", " ")}: ${text}`;
+      })
+      .join(" ");
+
+    if (message) return message;
+  }
+
+  return error.message || "The action could not be completed.";
+}
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState([]);
@@ -31,6 +87,9 @@ export default function ApplicationsPage() {
   const [message, setMessage] = useState("");
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
+  // Blocks repeated clicks immediately, before React renders again.
+  const mutationRef = useRef(false);
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -42,7 +101,7 @@ export default function ApplicationsPage() {
         const data = await listStaffApplications(
           page,
           status,
-          controller.signal
+          controller.signal,
         );
 
         if (!Array.isArray(data?.results)) {
@@ -52,6 +111,8 @@ export default function ApplicationsPage() {
         if (!controller.signal.aborted) {
           setApplications(data.results);
           setHasNext(Boolean(data.next));
+
+          // Only a successful reload unlocks further actions.
           setNeedsRefresh(false);
         }
       } catch (err) {
@@ -59,7 +120,7 @@ export default function ApplicationsPage() {
           setError(
             err instanceof TypeError
               ? "Could not connect. Please try again."
-              : err.message
+              : err.message || "Could not load applications.",
           );
         }
       } finally {
@@ -75,6 +136,8 @@ export default function ApplicationsPage() {
   }, [page, status, retry]);
 
   function reloadList() {
+    if (mutationRef.current || loading) return;
+
     setConfirmation(null);
     setActionError("");
     setLoading(true);
@@ -82,9 +145,45 @@ export default function ApplicationsPage() {
     setRetry((value) => value + 1);
   }
 
-  function openConfirmation(application, action) {
+  function changeStatus(nextStatus) {
+    if (mutationRef.current || loading || needsRefresh) return;
+
+    setStatus(nextStatus);
+    setPage(1);
+    setConfirmation(null);
     setMessage("");
     setActionError("");
+    setLoading(true);
+  }
+
+  function changePage(nextPage) {
+    if (
+      mutationRef.current ||
+      loading ||
+      needsRefresh ||
+      nextPage < 1
+    ) {
+      return;
+    }
+
+    setConfirmation(null);
+    setLoading(true);
+    setPage(nextPage);
+  }
+
+  function openConfirmation(application, action) {
+    if (
+      mutationRef.current ||
+      loading ||
+      needsRefresh ||
+      application.status !== "pending"
+    ) {
+      return;
+    }
+
+    setMessage("");
+    setActionError("");
+
     setConfirmation({
       id: application.id,
       roomNumber: application.room_number,
@@ -93,10 +192,20 @@ export default function ApplicationsPage() {
   }
 
   async function handleConfirm() {
-    if (!confirmation || acting || needsRefresh) return;
+    if (
+      !confirmation ||
+      mutationRef.current ||
+      loading ||
+      needsRefresh
+    ) {
+      return;
+    }
 
     const { id, action } = confirmation;
 
+    if (!["approve", "reject"].includes(action)) return;
+
+    mutationRef.current = true;
     setActing(true);
     setActionError("");
     setMessage("");
@@ -110,12 +219,16 @@ export default function ApplicationsPage() {
         }
 
         setMessage(
-          `Application #${id} approved. Stay #${stay.id} was created. Check the stay and initial rent charge for payment details.`
+          `Application #${id} approved. Stay #${stay.id} was created. ` +
+            "Check the stay and initial rent charge for payment details.",
         );
       } else {
         const application = await rejectApplication(id);
 
-        if (application?.status !== "rejected") {
+        if (
+          application?.id !== id ||
+          application.status !== "rejected"
+        ) {
           throw new Error("Unexpected rejection response.");
         }
 
@@ -131,42 +244,69 @@ export default function ApplicationsPage() {
       setConfirmation(null);
 
       if ([400, 401, 403, 404].includes(err.status)) {
-        setActionError(err.message);
+        setActionError(getErrorMessage(err));
       } else if (err.status === 429) {
-        setActionError("Too many requests. Please wait before trying again.");
+        setActionError(
+          "Too many requests. Please wait before trying again.",
+        );
       } else {
         setActionError(
-          "We couldn’t confirm the result. Refresh the list to check the application before trying again."
+          "We couldn’t confirm the result. Refresh the list to check " +
+            "the application before trying again.",
         );
       }
 
       setNeedsRefresh(true);
     } finally {
+      mutationRef.current = false;
       setActing(false);
     }
   }
 
+  const actionsDisabled = acting || loading || needsRefresh;
+
   return (
-    <section>
-      <div className="flex flex-wrap items-end justify-between gap-5">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-            Hostel management
-          </p>
+    <section
+      aria-labelledby="applications-heading"
+      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
+    >
+      {/* Page introduction */}
+      <header
+        className="rounded-2xl border border-[#245747]/10
+          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
+          to-[#DCE9DD] p-5 sm:p-6"
+      >
+        <p
+          className="text-xs font-semibold uppercase
+            tracking-[0.14em] text-[#965038]"
+        >
+          Accommodation requests
+        </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            Accommodation applications
-          </h1>
+        <h1
+          id="applications-heading"
+          className="mt-2 font-heading text-2xl
+            font-bold tracking-tight text-[#173F35]"
+        >
+          Applications
+        </h1>
 
-          <p className="mt-3 text-slate-500">
-            Review residents’ accommodation requests.
-          </p>
-        </div>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
+          Review room requests, check move-in dates and give residents
+          their next step.
+        </p>
+      </header>
 
-        <div>
+      {/* Filter and refresh */}
+      <div
+        className="flex flex-wrap items-end justify-between
+          gap-4 rounded-2xl border border-[#245747]/15
+          bg-white p-4 sm:p-5"
+      >
+        <div className="w-full sm:w-auto sm:min-w-56">
           <label
             htmlFor="application-status"
-            className="mb-2 block text-sm font-semibold text-slate-700"
+            className="block text-sm font-semibold text-[#173F35]"
           >
             Application status
           </label>
@@ -174,16 +314,14 @@ export default function ApplicationsPage() {
           <select
             id="application-status"
             value={status}
-            disabled={acting || loading}
-            onChange={(event) => {
-              setStatus(event.target.value);
-              setPage(1);
-              setConfirmation(null);
-              setMessage("");
-              setActionError("");
-              setLoading(true);
-            }}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm disabled:opacity-50"
+            disabled={actionsDisabled}
+            onChange={(event) => changeStatus(event.target.value)}
+            className="mt-2 min-h-11 w-full rounded-xl
+              border border-[#245747]/20 bg-[#FAF7F2]/60
+              px-3 py-2.5 text-sm text-[#173F35]
+              focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-[#245747]
+              disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
@@ -192,12 +330,23 @@ export default function ApplicationsPage() {
             <option value="">All applications</option>
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={reloadList}
+          disabled={loading || acting}
+          className={secondaryButton}
+        >
+          <span aria-hidden="true">↻</span>
+          Refresh
+        </button>
       </div>
 
       {message && (
         <p
           role="status"
-          className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
+          className="rounded-xl border border-emerald-100
+            bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {message}
         </p>
@@ -206,7 +355,8 @@ export default function ApplicationsPage() {
       {actionError && (
         <div
           role="alert"
-          className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"
+          className="rounded-xl border border-amber-200
+            bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -214,172 +364,258 @@ export default function ApplicationsPage() {
             type="button"
             onClick={reloadList}
             disabled={loading || acting}
-            className="mt-3 font-semibold underline disabled:opacity-50"
+            className="mt-2 inline-flex min-h-11 items-center
+              rounded-lg font-semibold underline underline-offset-4
+              disabled:cursor-not-allowed disabled:opacity-50"
           >
             Refresh applications
           </button>
         </div>
       )}
 
-      <div className="mt-8">
-        {loading ? (
-          <LoadingMessage label="Loading applications…" />
-        ) : error ? (
-          <div role="alert" className="rounded-xl bg-red-50 p-6 text-red-800">
-            <p>{error}</p>
+      {loading ? (
+        <div
+          className="rounded-2xl border
+            border-[#245747]/15 bg-white p-5"
+        >
+          <LoadingMessage label="Loading applications…" compact />
+        </div>
+      ) : error ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-100
+            bg-red-50 p-5 text-sm leading-6 text-red-800"
+        >
+          <p>{error}</p>
 
-            <button
-              type="button"
-              onClick={reloadList}
-              className="mt-3 font-semibold underline"
-            >
-              Try again
-            </button>
-          </div>
-        ) : applications.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <h2 className="text-xl font-bold text-slate-900">
-              No applications found
-            </h2>
+          <button
+            type="button"
+            onClick={reloadList}
+            disabled={acting}
+            className="mt-2 inline-flex min-h-11 items-center
+              rounded-lg font-semibold underline underline-offset-4
+              disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      ) : applications.length === 0 ? (
+        <div
+          className="rounded-2xl border border-dashed
+            border-[#245747]/25 bg-white px-5 py-9 text-center"
+        >
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
+            {status === "pending"
+              ? "No pending applications."
+              : "No applications found."}
+          </h2>
 
-            <p className="mt-3 text-slate-500">
-              No applications currently match this status.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-2">
-            {applications.map((application) => (
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            {status
+              ? "No applications currently match this status."
+              : "Residents’ room applications will appear here."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {applications.map((application) => {
+            const isConfirming = confirmation?.id === application.id;
+
+            return (
               <article
                 key={application.id}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                aria-labelledby={`application-${application.id}-heading`}
+                className="min-w-0 rounded-2xl border
+                  border-[#245747]/15 bg-white p-4 sm:p-5"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-xl font-bold text-slate-900">
-                    Room {application.room_number}
-                  </h2>
+                {/* Compact summary row */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#78716C]">
+                      Application #{application.id}
+                    </p>
+
+                    <h2
+                      id={`application-${application.id}-heading`}
+                      className="mt-1 break-words font-heading
+                        text-base font-semibold text-[#173F35]"
+                    >
+                      Room {application.room_number}
+                    </h2>
+                  </div>
 
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-                      statusStyles[application.status] ||
-                      "bg-slate-100 text-slate-600"
-                    }`}
+                    className={`rounded-full px-3 py-1.5
+                      text-xs font-semibold capitalize ${
+                        statusStyles[application.status] ||
+                        "bg-stone-100 text-stone-600"
+                      }`}
                   >
                     {application.status}
                   </span>
                 </div>
 
-                <dl className="mt-5 space-y-3 text-sm">
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <dt className="text-slate-500">Application</dt>
-                    <dd className="font-medium">#{application.id}</dd>
-                  </div>
+                <div
+                  className="mt-4 flex flex-wrap items-end
+                    justify-between gap-4"
+                >
+                  <dl className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-[#78716C]">
+                        Applicant ID
+                      </dt>
+                      <dd className="mt-1 font-medium text-[#173F35]">
+                        #{application.applicant}
+                      </dd>
+                    </div>
 
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <dt className="text-slate-500">Applicant ID</dt>
-                    <dd className="font-medium">#{application.applicant}</dd>
-                  </div>
+                    <div>
+                      <dt className="text-xs text-[#78716C]">
+                        Requested move-in
+                      </dt>
+                      <dd className="mt-1 font-medium text-[#173F35]">
+                        {application.move_in_date || "Not provided"}
+                      </dd>
+                    </div>
+                  </dl>
 
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <dt className="text-slate-500">Requested move-in</dt>
-                    <dd className="font-medium">{application.move_in_date}</dd>
-                  </div>
-                </dl>
+                  {application.status === "pending" && !isConfirming && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openConfirmation(application, "approve")
+                        }
+                        disabled={actionsDisabled}
+                        aria-label={`Approve application #${application.id}`}
+                        className={primaryButton}
+                      >
+                        Approve
+                      </button>
 
-                {application.status === "pending" && (
-                  <div className="mt-6 border-t border-slate-100 pt-5">
-                    {confirmation?.id === application.id ? (
-                      <div className="rounded-xl bg-slate-50 p-4">
-                        <p className="font-semibold text-slate-900">
-                          {confirmation.action === "approve"
-                            ? "Approve this application?"
-                            : "Reject this application?"}
-                        </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openConfirmation(application, "reject")
+                        }
+                        disabled={actionsDisabled}
+                        aria-label={`Reject application #${application.id}`}
+                        className={rejectButton}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {confirmation.action === "approve"
-                            ? "Approval creates a stay awaiting payment and its initial rent charge."
-                            : "The resident will see this application as rejected."}
-                        </p>
+                <details className="mt-4 border-t border-[#245747]/10 pt-2">
+                  <summary
+                    className="w-fit cursor-pointer rounded-lg
+                      py-2 text-xs font-semibold text-[#245747]
+                      focus-visible:outline-2
+                      focus-visible:outline-offset-2
+                      focus-visible:outline-[#245747]"
+                  >
+                    Application details
+                  </summary>
 
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setConfirmation(null)}
-                            disabled={acting}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                          >
-                            Go back
-                          </button>
+                  <div className="mt-2 space-y-2 pb-1 text-xs leading-6 text-[#57534E]">
+                    <p>
+                      Submitted: {formatTimestamp(application.created_at)}
+                    </p>
 
-                          <button
-                            type="button"
-                            onClick={handleConfirm}
-                            disabled={acting || needsRefresh}
-                            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                          >
-                            {acting
-                              ? "Processing…"
-                              : `Confirm ${confirmation.action}`}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => openConfirmation(application, "approve")}
-                          disabled={acting || needsRefresh}
-                          className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
+                    <p>Submission time is shown in Nairobi time.</p>
 
-                        <button
-                          type="button"
-                          onClick={() => openConfirmation(application, "reject")}
-                          disabled={acting || needsRefresh}
-                          className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </div>
+                    {application.status === "approved" && (
+                      <p>
+                        Check the resident’s stay and initial rent charge
+                        for payment and reservation status.
+                      </p>
                     )}
+                  </div>
+                </details>
+
+                {/* Confirmation stays beside the application being changed. */}
+                {application.status === "pending" && isConfirming && (
+                  <div
+                    role="group"
+                    aria-labelledby={`confirmation-${application.id}`}
+                    aria-busy={acting}
+                    className="mt-4 rounded-xl border
+                      border-[#245747]/15 bg-[#FAF7F2] p-4"
+                  >
+                    <h3
+                      id={`confirmation-${application.id}`}
+                      className="text-sm font-semibold text-[#173F35]"
+                    >
+                      {confirmation.action === "approve"
+                        ? `Approve application #${application.id}?`
+                        : `Reject application #${application.id}?`}
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-[#57534E]">
+                      {confirmation.action === "approve"
+                        ? "Approval creates a stay awaiting payment and its initial rent charge. The resident must pay before the deadline to confirm the reservation."
+                        : "The resident will see this application as rejected."}
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmation(null)}
+                        disabled={acting}
+                        className={secondaryButton}
+                      >
+                        Go back
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={actionsDisabled}
+                        className={
+                          confirmation.action === "approve"
+                            ? primaryButton
+                            : `${buttonBase} bg-red-700 text-white hover:bg-red-800`
+                        }
+                      >
+                        {acting
+                          ? "Processing…"
+                          : confirmation.action === "approve"
+                            ? "Confirm approval"
+                            : "Confirm rejection"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </article>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       <nav
         aria-label="Application pages"
-        className="mt-8 flex items-center justify-center gap-4"
+        className="flex items-center justify-between gap-3"
       >
         <button
           type="button"
-          disabled={loading || acting || page === 1}
-          onClick={() => {
-            setConfirmation(null);
-            setLoading(true);
-            setPage((value) => value - 1);
-          }}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:opacity-40"
+          disabled={actionsDisabled || page === 1}
+          onClick={() => changePage(page - 1)}
+          className={secondaryButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-600">Page {page}</span>
+        <span className="text-sm text-[#57534E]">
+          Page {page}
+        </span>
 
         <button
           type="button"
-          disabled={loading || acting || Boolean(error) || !hasNext}
-          onClick={() => {
-            setConfirmation(null);
-            setLoading(true);
-            setPage((value) => value + 1);
-          }}
-          className="rounded-xl border border-slate-300 px-4 py-2 disabled:opacity-40"
+          disabled={actionsDisabled || Boolean(error) || !hasNext}
+          onClick={() => changePage(page + 1)}
+          className={secondaryButton}
         >
           Next
         </button>

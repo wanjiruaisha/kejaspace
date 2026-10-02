@@ -9,10 +9,71 @@ const stayLabels = {
 };
 
 const stayStyles = {
-  checked_in: "bg-emerald-50 text-emerald-700",
-  reserved: "bg-blue-50 text-blue-700",
+  checked_in: "bg-emerald-50 text-emerald-800",
+  reserved: "bg-[#E8EDE4] text-[#245747]",
   awaiting_payment: "bg-amber-50 text-amber-800",
 };
+
+const buttonStyle =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "border border-[#245747]/20 bg-white px-4 py-2 text-sm font-semibold " +
+  "text-[#245747] transition-colors hover:bg-[#EDF3E8] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const inputStyle =
+  "mt-2 min-h-11 w-full rounded-xl border border-[#245747]/20 " +
+  "bg-white px-3.5 py-2.5 text-sm text-[#173F35] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] disabled:opacity-60";
+
+function RoomStatusBadge({ active }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        active
+          ? "bg-emerald-50 text-emerald-800"
+          : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+function RoomFigures({ room }) {
+  const figures = [
+    { label: "Capacity", value: room.capacity },
+    { label: "Checked in", value: room.checked_in },
+    { label: "Reserved", value: room.reserved },
+    { label: "Payment holds", value: room.payment_holds },
+    { label: "Available", value: room.available_spaces, highlighted: true },
+  ];
+
+  return (
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      {figures.map((figure) => (
+        <div
+          key={figure.label}
+          className={
+            figure.highlighted
+              ? "rounded-xl bg-[#EDF3E8] px-3 py-2.5"
+              : "px-3 py-2.5"
+          }
+        >
+          <dt className="text-xs leading-5 text-[#57534E]">
+            {figure.label}
+          </dt>
+
+          <dd className="mt-1 text-lg font-semibold tabular-nums text-[#173F35]">
+            {figure.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export default function OccupancyReportPage() {
   const [rooms, setRooms] = useState([]);
@@ -53,6 +114,7 @@ export default function OccupancyReportPage() {
           (room) =>
             room &&
             room.id != null &&
+            typeof room.is_active === "boolean" &&
             Array.isArray(room.residents) &&
             [
               room.capacity,
@@ -60,7 +122,13 @@ export default function OccupancyReportPage() {
               room.reserved,
               room.payment_holds,
               room.available_spaces,
-            ].every((value) => Number.isInteger(value) && value >= 0),
+            ].every((value) => Number.isInteger(value) && value >= 0) &&
+            room.residents.every(
+              (resident) =>
+                resident &&
+                resident.resident_id != null &&
+                typeof resident.stay_status === "string",
+            ),
         );
 
         if (!validRooms) {
@@ -93,12 +161,16 @@ export default function OccupancyReportPage() {
   }, [page, active, retry]);
 
   function refreshReport() {
+    if (loading) return;
+
     setExpandedRoomId(null);
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
   function changeFilter(event) {
+    if (loading) return;
+
     setActive(event.target.value);
     setPage(1);
     setExpandedRoomId(null);
@@ -106,39 +178,51 @@ export default function OccupancyReportPage() {
   }
 
   function changePage(nextPage) {
+    if (loading || nextPage < 1 || nextPage === page) return;
+
     setExpandedRoomId(null);
     setLoading(true);
     setPage(nextPage);
   }
 
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Reports
-          </p>
+    <section className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
+      {/* Page header */}
+      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+              Reports
+            </p>
 
-          <h1 className="page-title mt-2">Room occupancy</h1>
+            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+              Room occupancy
+            </h1>
 
-          <p className="page-description">
-            See room capacity, current allocations and available spaces.
-          </p>
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              See who has moved in, which spaces are reserved and what
+              is still available.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={refreshReport}
+            disabled={loading}
+            className={buttonStyle}
+          >
+            {loading ? "Loading…" : "Refresh report"}
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={refreshReport}
-          disabled={loading}
-          className="button-secondary"
-        >
-          {loading ? "Loading…" : "Refresh"}
-        </button>
       </header>
 
-      <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="w-full sm:w-52">
-          <label htmlFor="occupancy-active" className="form-label">
+      {/* Room-status filter */}
+      <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-[#245747]/15 bg-white p-4">
+        <div className="w-full sm:w-60">
+          <label
+            htmlFor="occupancy-active"
+            className="block text-sm font-semibold text-[#173F35]"
+          >
             Room status
           </label>
 
@@ -146,7 +230,8 @@ export default function OccupancyReportPage() {
             id="occupancy-active"
             value={active}
             onChange={changeFilter}
-            className="form-input"
+            disabled={loading}
+            className={inputStyle}
           >
             <option value="">All rooms</option>
             <option value="true">Active rooms</option>
@@ -155,200 +240,183 @@ export default function OccupancyReportPage() {
         </div>
 
         {!loading && !error && (
-          <p role="status" className="text-sm text-slate-500">
-            {count} matching {count === 1 ? "room" : "rooms"}
+          <p role="status" className="text-sm text-[#57534E]">
+            <span className="font-semibold text-[#173F35]">{count}</span>{" "}
+            matching {count === 1 ? "room" : "rooms"}
+            <span className="mt-1 block text-xs text-[#78716C]">
+              {rooms.length} shown on this page
+            </span>
           </p>
         )}
       </div>
 
+      {/* Room report */}
       {loading ? (
         <div
           role="status"
-          className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600"
+          className="rounded-2xl border border-[#245747]/15 bg-white p-6 text-sm text-[#57534E]"
         >
           Loading the occupancy report…
         </div>
       ) : error ? (
         <div
           role="alert"
-          className="rounded-2xl border border-red-100 bg-red-50 p-5 text-sm text-red-800"
+          className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-800"
         >
           <p>{error}</p>
 
-          <button
-            type="button"
-            onClick={refreshReport}
-            className="mt-3 font-semibold underline"
-          >
-            Try again
-          </button>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={refreshReport}
+              className="min-h-11 font-semibold underline"
+            >
+              Try again
+            </button>
+
+            {page > 1 && (
+              <button
+                type="button"
+                onClick={() => changePage(1)}
+                className="min-h-11 font-semibold underline"
+              >
+                Return to page 1
+              </button>
+            )}
+          </div>
         </div>
       ) : rooms.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div className="rounded-2xl border border-dashed border-[#245747]/25 bg-white p-6 text-center">
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
             No rooms found
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">
-            No rooms match the selected status.
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            No rooms on this page match the selected status.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
-              <caption className="sr-only">
-                Room capacity, allocations and residents
-              </caption>
+        <ul className="space-y-3">
+          {rooms.map((room) => {
+            const expanded = expandedRoomId === room.id;
+            const residentsPanelId = `room-residents-${room.id}`;
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="px-4 py-3">
-                    Room
-                  </th>
-                  <th scope="col" className="px-4 py-3">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Capacity
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Checked in
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Reserved
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Holds
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Available
-                  </th>
-                  <th scope="col" className="px-4 py-3">
-                    Details
-                  </th>
-                </tr>
-              </thead>
+            return (
+              <li
+                key={room.id}
+                className={`overflow-hidden rounded-2xl border bg-white ${
+                  expanded
+                    ? "border-[#245747]/40"
+                    : "border-[#245747]/15"
+                }`}
+              >
+                <article aria-labelledby={`room-heading-${room.id}`}>
+                  <div className="p-4 sm:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h2
+                          id={`room-heading-${room.id}`}
+                          className="break-words font-heading text-base font-semibold text-[#173F35]"
+                        >
+                          Room {room.room_number}
+                        </h2>
 
-              {rooms.map((room) => {
-                const expanded = expandedRoomId === room.id;
+                        <RoomStatusBadge active={room.is_active} />
+                      </div>
 
-                return (
-                  <tbody
-                    key={room.id}
-                    className="border-b border-slate-100 last:border-b-0"
-                  >
-                    <tr className="hover:bg-slate-50/70">
-                      <th
-                        scope="row"
-                        className="px-4 py-3 font-semibold text-slate-900"
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-controls={residentsPanelId}
+                        aria-label={`${
+                          expanded ? "Hide" : "View"
+                        } allocations for room ${room.room_number}`}
+                        onClick={() =>
+                          setExpandedRoomId((current) =>
+                            current === room.id ? null : room.id,
+                          )
+                        }
+                        className={buttonStyle}
                       >
-                        {room.room_number}
-                      </th>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                            room.is_active
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {room.is_active ? "Active" : "Inactive"}
+                        {expanded ? "Hide allocations" : "View allocations"}
+                        <span aria-hidden="true">
+                          {expanded ? "−" : "+"}
                         </span>
-                      </td>
+                      </button>
+                    </div>
 
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {room.capacity}
-                      </td>
+                    <div className="mt-3 border-t border-[#245747]/10 pt-3">
+                      <RoomFigures room={room} />
+                    </div>
 
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {room.checked_in}
-                      </td>
+                    {!room.is_active && (
+                      <p className="mt-3 text-xs leading-5 text-[#78716C]">
+                        This room is inactive, so no spaces are shown as
+                        available for new allocations.
+                      </p>
+                    )}
+                  </div>
 
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {room.reserved}
-                      </td>
+                  {/* Expanded allocation list */}
+                  <div
+                    id={residentsPanelId}
+                    hidden={!expanded}
+                    className="border-t border-[#245747]/10 bg-[#FAF7F2] p-4 sm:p-5"
+                  >
+                    <h3 className="text-sm font-semibold text-[#173F35]">
+                      Current allocations
+                    </h3>
 
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {room.payment_holds}
-                      </td>
+                    <p className="mt-1 text-xs leading-5 text-[#78716C]">
+                      Includes checked-in residents, reservations and
+                      unexpired payment holds.
+                    </p>
 
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-blue-700">
-                        {room.available_spaces}
-                      </td>
+                    {room.residents.length === 0 ? (
+                      <p className="mt-3 text-sm leading-6 text-[#57534E]">
+                        No current residents, reservations or unexpired
+                        payment holds for this room.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {room.residents.map((resident, index) => (
+                          <li
+                            key={`${room.id}-${resident.resident_id}-${resident.stay_status}-${index}`}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#245747]/10 bg-white px-4 py-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-semibold text-[#173F35]">
+                                {resident.name ||
+                                  `Resident #${resident.resident_id}`}
+                              </p>
 
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          aria-expanded={expanded}
-                          aria-controls={`room-residents-${room.id}`}
-                          aria-label={`${
-                            expanded ? "Hide" : "View"
-                          } residents for room ${room.room_number}`}
-                          onClick={() =>
-                            setExpandedRoomId(expanded ? null : room.id)
-                          }
-                          className="whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                        >
-                          {expanded ? "Hide residents" : "View residents"}
-                        </button>
-                      </td>
-                    </tr>
+                              <p className="mt-1 text-xs text-[#78716C]">
+                                Resident #{resident.resident_id}
+                              </p>
+                            </div>
 
-                    <tr hidden={!expanded}>
-                      <td colSpan={8} className="bg-slate-50 px-4 py-4">
-                        <div id={`room-residents-${room.id}`}>
-                          <h2 className="text-sm font-semibold text-slate-900">
-                            Current allocations · Room {room.room_number}
-                          </h2>
-
-                          {room.residents.length === 0 ? (
-                            <p className="mt-2 text-sm text-slate-500">
-                              No current residents, reservations or unexpired
-                              payment holds.
-                            </p>
-                          ) : (
-                            <ul className="mt-3 grid gap-2 lg:grid-cols-2">
-                              {room.residents.map((resident) => (
-                                <li
-                                  key={`${room.id}-${resident.resident_id}-${resident.stay_status}`}
-                                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="break-words text-sm font-medium text-slate-900">
-                                      {resident.name}
-                                    </p>
-
-                                    <p className="mt-0.5 text-xs text-slate-500">
-                                      Resident #{resident.resident_id}
-                                    </p>
-                                  </div>
-
-                                  <span
-                                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                                      stayStyles[resident.stay_status] ||
-                                      "bg-slate-100 text-slate-600"
-                                    }`}
-                                  >
-                                    {stayLabels[resident.stay_status] ||
-                                      resident.stay_status}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                );
-              })}
-            </table>
-          </div>
-        </div>
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                stayStyles[resident.stay_status] ||
+                                "bg-stone-100 text-stone-600"
+                              }`}
+                            >
+                              {stayLabels[resident.stay_status] ||
+                                resident.stay_status.replaceAll("_", " ")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
+      {/* Pagination */}
       {!error && (
         <nav
           aria-label="Occupancy report pages"
@@ -358,50 +426,67 @@ export default function OccupancyReportPage() {
             type="button"
             disabled={loading || page === 1}
             onClick={() => changePage(page - 1)}
-            className="button-secondary"
+            className={buttonStyle}
           >
             Previous
           </button>
 
-          <span className="text-sm text-slate-500">Page {page}</span>
+          <span className="text-sm text-[#78716C]">Page {page}</span>
 
           <button
             type="button"
             disabled={loading || !hasNext}
             onClick={() => changePage(page + 1)}
-            className="button-secondary"
+            className={buttonStyle}
           >
             Next
           </button>
         </nav>
       )}
 
-      <details className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        <summary className="cursor-pointer font-medium text-slate-800">
+      {/* Report explanation */}
+      <details className="rounded-2xl border border-[#245747]/15 bg-white p-4 text-sm text-[#57534E]">
+        <summary className="cursor-pointer rounded-lg font-semibold text-[#173F35] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#245747]">
           What do these numbers mean?
         </summary>
 
-        <ul className="mt-3 space-y-2 leading-6">
-          <li>
-            <strong>Checked in:</strong> residents who have moved in.
-          </li>
-          <li>
-            <strong>Reserved:</strong> confirmed stays awaiting check-in.
-          </li>
-          <li>
-            <strong>Holds:</strong> spaces temporarily allocated while residents
-            await payment, before their deadlines expire.
-          </li>
-          <li>
-            <strong>Available:</strong> capacity minus checked-in residents,
-            reservations and unexpired holds. Inactive rooms show zero available
-            spaces.
-          </li>
-        </ul>
+        <dl className="mt-4 grid gap-4 leading-6 sm:grid-cols-2">
+          <div>
+            <dt className="font-semibold text-[#173F35]">Capacity</dt>
+            <dd>The total number of residents the room can accommodate.</dd>
+          </div>
 
-        <p className="mt-3 leading-6">
-          This report is a snapshot. Use Refresh after changing a stay or when a
-          payment hold expires.
+          <div>
+            <dt className="font-semibold text-[#173F35]">Checked in</dt>
+            <dd>Residents who have moved in.</dd>
+          </div>
+
+          <div>
+            <dt className="font-semibold text-[#173F35]">Reserved</dt>
+            <dd>Confirmed stays awaiting check-in.</dd>
+          </div>
+
+          <div>
+            <dt className="font-semibold text-[#173F35]">Payment holds</dt>
+            <dd>
+              Spaces temporarily allocated while residents await payment,
+              before their deadlines expire.
+            </dd>
+          </div>
+
+          <div className="sm:col-span-2">
+            <dt className="font-semibold text-[#173F35]">Available</dt>
+            <dd>
+              Capacity minus checked-in residents, reservations and
+              unexpired payment holds, with a minimum of zero.
+              Inactive rooms show zero available spaces.
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 border-t border-[#245747]/10 pt-4 text-xs leading-6 text-[#78716C]">
+          This report is a snapshot. Refresh after changing a stay or
+          when a payment hold expires.
         </p>
       </details>
     </section>

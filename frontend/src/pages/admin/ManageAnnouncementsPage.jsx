@@ -14,24 +14,60 @@ const emptyForm = {
   is_published: false,
 };
 
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
+  "px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#EDF3E8]";
+
+const dangerButton =
+  `${buttonBase} border border-red-200 bg-white ` +
+  "text-red-700 hover:bg-red-50";
+
+const inputStyle =
+  "mt-2 min-h-11 w-full rounded-xl border border-[#245747]/20 " +
+  "bg-white px-3.5 py-2.5 text-sm text-[#173F35] " +
+  "placeholder:text-[#78716C] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+const labelStyle = "block text-sm font-semibold text-[#173F35]";
+
+const dateFormatter = new Intl.DateTimeFormat("en-KE", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Africa/Nairobi",
+});
+
 function getErrorMessage(error) {
-  if (typeof error.data?.detail === "string") {
+  if (typeof error?.data?.detail === "string") {
     return error.data.detail;
   }
 
-  if (error.data && typeof error.data === "object") {
-    return Object.entries(error.data)
-      .map(([field, value]) => {
-        const message = Array.isArray(value)
-          ? value.join(" ")
-          : String(value);
+  if (error?.data && typeof error.data === "object") {
+    const messages = Object.entries(error.data).map(([field, value]) => {
+      const message = Array.isArray(value)
+        ? value.join(" ")
+        : String(value);
 
-        return `${field}: ${message}`;
-      })
-      .join(" ");
+      return field === "detail" || field === "non_field_errors"
+        ? message
+        : `${field.replaceAll("_", " ")}: ${message}`;
+    });
+
+    if (messages.length > 0) return messages.join(" ");
   }
 
-  return error.message || "The action could not be completed.";
+  return error?.message || "The action could not be completed.";
 }
 
 function formatDate(value) {
@@ -39,22 +75,18 @@ function formatDate(value) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "Unavailable";
-
-  return new Intl.DateTimeFormat("en-KE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Africa/Nairobi",
-  }).format(date);
+  return Number.isNaN(date.getTime())
+    ? "Unavailable"
+    : dateFormatter.format(date);
 }
 
 function PublicationBadge({ published }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
         published
           ? "bg-emerald-50 text-emerald-800"
-          : "bg-slate-100 text-slate-600"
+          : "bg-[#F8EDE5] text-[#965038]"
       }`}
     >
       {published ? "Published" : "Draft"}
@@ -72,7 +104,7 @@ export default function ManageAnnouncementsPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
 
-  // Panel can be null, "view", "create" or "edit".
+  // null, "view", "create", or "edit"
   const [panel, setPanel] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -89,6 +121,8 @@ export default function ManageAnnouncementsPage() {
   const panelRef = useRef(null);
   const titleRef = useRef(null);
   const triggerRef = useRef(null);
+
+  const selectedId = selected?.id;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -119,7 +153,7 @@ export default function ManageAnnouncementsPage() {
           setListError(
             error instanceof TypeError
               ? "Could not connect. Please check your connection."
-              : error.message || "Could not load announcements.",
+              : getErrorMessage(error),
           );
         }
       } finally {
@@ -143,12 +177,8 @@ export default function ManageAnnouncementsPage() {
         : panelRef.current;
 
     target?.focus({ preventScroll: true });
-
-    panelRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "auto",
-    });
-  }, [panel, selected?.id]);
+    panelRef.current?.scrollIntoView({ block: "nearest" });
+  }, [panel, selectedId]);
 
   function resetPanel() {
     setPanel(null);
@@ -167,21 +197,27 @@ export default function ManageAnnouncementsPage() {
     }
   }
 
-  function refreshList() {
+  // Also used internally after a successful save or delete.
+  function reloadList() {
     resetPanel();
     setReviewReloaded(false);
     setLoading(true);
     setRetry((value) => value + 1);
   }
 
+  function refreshList() {
+    if (mutationRef.current || loading) return;
+    reloadList();
+  }
+
   function showLatestList() {
     setPublished("");
     setPage(1);
-    refreshList();
+    reloadList();
   }
 
   function startCreating(button) {
-    if (mutationRef.current || needsCheck) return;
+    if (mutationRef.current || loading || needsCheck) return;
 
     triggerRef.current = button;
     setSelected(null);
@@ -193,7 +229,7 @@ export default function ManageAnnouncementsPage() {
   }
 
   function openDetails(announcement, button) {
-    if (mutationRef.current) return;
+    if (mutationRef.current || loading) return;
 
     triggerRef.current = button;
     setSelected(announcement);
@@ -206,7 +242,7 @@ export default function ManageAnnouncementsPage() {
   }
 
   function startEditing() {
-    if (!selected || mutationRef.current || needsCheck) return;
+    if (!selected || mutationRef.current || loading || needsCheck) return;
 
     setForm({
       title: selected.title,
@@ -221,20 +257,42 @@ export default function ManageAnnouncementsPage() {
   }
 
   function changePage(nextPage) {
+    if (
+      mutationRef.current ||
+      loading ||
+      nextPage < 1 ||
+      nextPage === page
+    ) {
+      return;
+    }
+
     resetPanel();
+    setReviewReloaded(false);
     setLoading(true);
     setPage(nextPage);
   }
 
   function changeFilter(event) {
+    if (mutationRef.current || loading) return;
+
     resetPanel();
+    setReviewReloaded(false);
     setPublished(event.target.value);
     setPage(1);
     setLoading(true);
   }
 
+  function handleChange(event) {
+    const { name, value, type, checked } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
   function handleMutationError(error) {
-    if ([400, 401, 403, 404, 429].includes(error.status)) {
+    if ([400, 401, 403, 404, 409, 429].includes(error?.status)) {
       setActionError(
         error.status === 429
           ? "Too many requests. Please wait before trying again."
@@ -243,19 +301,20 @@ export default function ManageAnnouncementsPage() {
 
       if (error.status === 404) {
         setPage(1);
-        refreshList();
+        reloadList();
       }
-    } else {
-      setNeedsCheck(true);
-      setReviewReloaded(false);
 
-      setActionError(
-        "We could not confirm whether the change was saved. " +
-          "Check the refreshed list and notice details before making another change.",
-      );
-
-      showLatestList();
+      return;
     }
+
+    setNeedsCheck(true);
+    setReviewReloaded(false);
+    setActionError(
+      "We could not confirm whether the change was saved. " +
+        "Check the refreshed list and notice details before making another change.",
+    );
+
+    showLatestList();
   }
 
   async function handleSubmit(event) {
@@ -263,6 +322,7 @@ export default function ManageAnnouncementsPage() {
 
     if (
       mutationRef.current ||
+      loading ||
       needsCheck ||
       !["create", "edit"].includes(panel)
     ) {
@@ -299,6 +359,7 @@ export default function ManageAnnouncementsPage() {
       if (
         saved?.id == null ||
         typeof saved.is_published !== "boolean" ||
+        saved.is_published !== data.is_published ||
         (editingId !== null && saved.id !== editingId)
       ) {
         throw new Error("Unexpected save response.");
@@ -322,6 +383,7 @@ export default function ManageAnnouncementsPage() {
   async function handleDelete() {
     if (
       mutationRef.current ||
+      loading ||
       needsCheck ||
       !confirmDelete ||
       !selected
@@ -341,8 +403,9 @@ export default function ManageAnnouncementsPage() {
 
       setSuccessMessage(`Announcement #${id} deleted.`);
       setPage(1);
-      refreshList();
+      reloadList();
     } catch (error) {
+      setConfirmDelete(false);
       handleMutationError(error);
     } finally {
       mutationRef.current = false;
@@ -350,35 +413,43 @@ export default function ManageAnnouncementsPage() {
     }
   }
 
+  const changesDisabled = loading || busy || needsCheck;
+
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Administration
-          </p>
+    <section className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
+      {/* Page header */}
+      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+              Administration
+            </p>
 
-          <h1 className="page-title mt-2">Manage announcements</h1>
+            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
+              Manage announcements
+            </h1>
 
-          <p className="page-description">
-            Create notices, manage drafts and publish hostel updates.
-          </p>
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Draft notices, publish hostel updates and keep residents informed.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={(event) => startCreating(event.currentTarget)}
+            disabled={changesDisabled}
+            className={primaryButton}
+          >
+            <span aria-hidden="true">+</span>
+            Add announcement
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={(event) => startCreating(event.currentTarget)}
-          disabled={loading || busy || needsCheck}
-          className="button-primary"
-        >
-          Add announcement
-        </button>
       </header>
 
       {successMessage && (
         <p
           role="status"
-          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {successMessage}
         </p>
@@ -386,35 +457,48 @@ export default function ManageAnnouncementsPage() {
 
       {actionError && (
         <div
+          id="announcement-action-error"
           role="alert"
-          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
           {needsCheck && (
-            <button
-              type="button"
-              disabled={
-                busy || loading || Boolean(listError) || !reviewReloaded
-              }
-              onClick={() => {
-                setNeedsCheck(false);
-                setActionError("");
-                resetPanel();
-              }}
-              className="mt-3 font-semibold underline disabled:opacity-50"
-            >
-              I have checked the list — continue
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={loading || busy}
+                onClick={refreshList}
+                className={secondaryButton}
+              >
+                Refresh announcements
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  busy || loading || Boolean(listError) || !reviewReloaded
+                }
+                onClick={() => {
+                  setNeedsCheck(false);
+                  setActionError("");
+                  closePanel();
+                }}
+                className={secondaryButton}
+              >
+                I have checked the list
+              </button>
+            </div>
           )}
         </div>
       )}
 
-      <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="w-full sm:w-56">
+      {/* Publication filter */}
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-[#245747]/15 bg-white p-4">
+        <div className="w-full sm:w-60">
           <label
             htmlFor="announcement-publication-filter"
-            className="form-label"
+            className={labelStyle}
           >
             Publication status
           </label>
@@ -424,7 +508,7 @@ export default function ManageAnnouncementsPage() {
             value={published}
             disabled={loading || busy}
             onChange={changeFilter}
-            className="form-input"
+            className={inputStyle}
           >
             <option value="">All announcements</option>
             <option value="true">Published</option>
@@ -436,119 +520,109 @@ export default function ManageAnnouncementsPage() {
           type="button"
           disabled={loading || busy}
           onClick={refreshList}
-          className="button-secondary"
+          className={secondaryButton}
         >
           Refresh
         </button>
       </div>
 
+      {/* Compact announcement rows */}
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-2xl border border-[#245747]/15 bg-white p-5">
           <LoadingMessage label="Loading announcements…" compact />
         </div>
       ) : listError ? (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 p-5 text-sm text-red-800"
+          className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-800"
         >
           <p>{listError}</p>
 
-          <button
-            type="button"
-            onClick={refreshList}
-            disabled={busy}
-            className="mt-3 font-semibold underline"
-          >
-            Try again
-          </button>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={refreshList}
+              disabled={busy}
+              className="min-h-11 font-semibold underline"
+            >
+              Try again
+            </button>
+
+            {page > 1 && (
+              <button
+                type="button"
+                onClick={() => changePage(1)}
+                disabled={busy}
+                className="min-h-11 font-semibold underline"
+              >
+                Return to page 1
+              </button>
+            )}
+          </div>
         </div>
       ) : announcements.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div className="rounded-2xl border border-dashed border-[#245747]/25 bg-white p-6 text-center">
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
             No announcements found
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">
-            No announcements match the selected publication status.
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            {published
+              ? "No notices on this page match the selected publication status."
+              : "Use Add announcement to write your first notice."}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[660px] table-fixed text-left text-sm">
-              <caption className="sr-only">
-                Announcement titles, publication status and update dates
-              </caption>
+        <ul className="space-y-3">
+          {announcements.map((announcement) => (
+            <li
+              key={announcement.id}
+              className={`rounded-2xl border p-4 transition-colors sm:p-5 ${
+                selected?.id === announcement.id
+                  ? "border-[#245747]/40 bg-[#EDF3E8]"
+                  : "border-[#245747]/15 bg-white hover:border-[#245747]/30"
+              }`}
+            >
+              <div className="grid items-center gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="min-w-0">
+                  <p className="text-xs text-[#78716C]">
+                    Notice #{announcement.id}
+                  </p>
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="w-[40%] px-4 py-3">
-                    Title
-                  </th>
-                  <th scope="col" className="w-[18%] px-4 py-3">
-                    Status
-                  </th>
-                  <th scope="col" className="w-[25%] px-4 py-3">
-                    Updated
-                  </th>
-                  <th scope="col" className="w-[17%] px-4 py-3">
-                    Details
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {announcements.map((announcement) => (
-                  <tr
-                    key={announcement.id}
-                    className={
-                      selected?.id === announcement.id
-                        ? "bg-blue-50/60"
-                        : "hover:bg-slate-50"
-                    }
+                  <h2
+                    title={announcement.title}
+                    className="mt-1 line-clamp-2 break-words font-heading text-base font-semibold text-[#173F35]"
                   >
-                    <th
-                      scope="row"
-                      className="px-4 py-3 font-medium text-slate-900"
-                    >
-                      <p className="truncate" title={announcement.title}>
-                        {announcement.title}
-                      </p>
+                    {announcement.title}
+                  </h2>
 
-                      <p className="mt-1 text-xs font-normal text-slate-500">
-                        Notice #{announcement.id}
-                      </p>
-                    </th>
+                  <p className="mt-2 text-xs leading-5 text-[#78716C]">
+                    Updated: {formatDate(announcement.updated_at)} · Nairobi
+                  </p>
+                </div>
 
-                    <td className="px-4 py-3">
-                      <PublicationBadge
-                        published={announcement.is_published}
-                      />
-                    </td>
+                <div>
+                  <PublicationBadge
+                    published={announcement.is_published}
+                  />
+                </div>
 
-                    <td className="px-4 py-3 text-xs leading-5 text-slate-500">
-                      {formatDate(announcement.updated_at)}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={(event) =>
-                          openDetails(announcement, event.currentTarget)
-                        }
-                        aria-label={`View announcement ${announcement.id}`}
-                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={(event) =>
+                    openDetails(announcement, event.currentTarget)
+                  }
+                  aria-label={`View announcement ${announcement.id}`}
+                  className={`${secondaryButton} w-full md:w-auto`}
+                >
+                  View details
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       <nav
@@ -559,62 +633,90 @@ export default function ManageAnnouncementsPage() {
           type="button"
           disabled={loading || busy || page === 1}
           onClick={() => changePage(page - 1)}
-          className="button-secondary"
+          className={secondaryButton}
         >
           Previous
         </button>
 
-        <span className="text-sm text-slate-500">Page {page}</span>
+        <span className="text-sm text-[#78716C]">Page {page}</span>
 
         <button
           type="button"
           disabled={loading || busy || Boolean(listError) || !hasNext}
           onClick={() => changePage(page + 1)}
-          className="button-secondary"
+          className={secondaryButton}
         >
           Next
         </button>
       </nav>
 
+      {/* Details / create / edit panel */}
       {panel && (
         <section
           ref={panelRef}
           tabIndex={-1}
           aria-labelledby="admin-notice-panel-title"
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+          onKeyDown={(event) => {
+            if (
+              event.key === "Escape" &&
+              panel === "view" &&
+              !confirmDelete &&
+              !mutationRef.current
+            ) {
+              closePanel();
+            }
+          }}
+          className="min-w-0 scroll-mt-24 rounded-2xl border border-[#245747]/20 bg-white p-4 focus-visible:outline-2 focus-visible:outline-[#245747] sm:p-6"
         >
           <div className="flex items-start justify-between gap-4">
-            <h2
-              id="admin-notice-panel-title"
-              className="min-w-0 break-words font-heading text-base font-semibold text-slate-900"
-            >
-              {panel === "create"
-                ? "Create announcement"
-                : panel === "edit"
-                  ? `Edit announcement #${selected?.id}`
-                  : selected?.title}
-            </h2>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#965038]">
+                {panel === "create"
+                  ? "New notice"
+                  : `Announcement #${selected?.id}`}
+              </p>
+
+              <h2
+                id="admin-notice-panel-title"
+                className="mt-2 break-words font-heading text-lg font-semibold text-[#173F35]"
+              >
+                {panel === "create"
+                  ? "Create announcement"
+                  : panel === "edit"
+                    ? "Edit announcement"
+                    : selected?.title}
+              </h2>
+            </div>
 
             <button
               type="button"
               onClick={closePanel}
               disabled={busy}
-              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              className={`${secondaryButton} shrink-0`}
             >
               Close
             </button>
           </div>
 
           {panel === "create" || panel === "edit" ? (
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              aria-busy={busy}
+              aria-describedby={
+                actionError ? "announcement-action-error" : undefined
+              }
+              className="mt-5"
+            >
               <fieldset
-                disabled={busy || needsCheck}
-                className="mt-5 space-y-4"
+                disabled={changesDisabled}
+                className="min-w-0 space-y-4"
               >
+                <legend className="sr-only">Announcement content</legend>
+
                 <div>
                   <label
                     htmlFor="announcement-title"
-                    className="form-label"
+                    className={labelStyle}
                   >
                     Title
                   </label>
@@ -622,66 +724,80 @@ export default function ManageAnnouncementsPage() {
                   <input
                     ref={titleRef}
                     id="announcement-title"
+                    name="title"
+                    type="text"
                     value={form.title}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        title: event.target.value,
-                      }))
-                    }
+                    onChange={handleChange}
+                    placeholder="For example, scheduled water maintenance"
                     required
-                    className="form-input"
+                    className={inputStyle}
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="announcement-message"
-                    className="form-label"
+                    className={labelStyle}
                   >
                     Message
                   </label>
 
                   <textarea
                     id="announcement-message"
-                    rows={5}
+                    name="message"
+                    rows={6}
                     value={form.message}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        message: event.target.value,
-                      }))
-                    }
+                    onChange={handleChange}
+                    placeholder="Include the relevant dates, times and what residents need to do."
                     required
-                    className="form-input resize-y"
+                    className={`${inputStyle} resize-y leading-6`}
                   />
                 </div>
 
-                <label className="flex items-start gap-3 text-sm text-slate-700">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-[#FAF7F2] p-4">
                   <input
                     type="checkbox"
+                    name="is_published"
                     checked={form.is_published}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        is_published: event.target.checked,
-                      }))
-                    }
-                    className="mt-1 size-4 accent-blue-700"
+                    onChange={handleChange}
+                    className="mt-1 size-4 shrink-0 accent-[#245747]"
                   />
 
                   <span>
-                    Publish this announcement
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    <span className="text-sm font-semibold text-[#173F35]">
+                      Publish this announcement
+                    </span>
+
+                    <span className="mt-1 block text-xs leading-5 text-[#57534E]">
                       Published notices are visible to logged-in users.
                       Leave unchecked to save a draft.
                     </span>
                   </span>
                 </label>
 
-                <div className="flex flex-wrap gap-3">
-                  <button type="submit" className="button-primary">
-                    {busy ? "Saving…" : "Save announcement"}
+                {panel === "edit" &&
+                  selected?.is_published &&
+                  !form.is_published && (
+                    <p
+                      role="status"
+                      className="rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-900"
+                    >
+                      Saving will move this notice back to drafts and
+                      remove it from the reader noticeboard.
+                    </p>
+                  )}
+
+                <div className="flex flex-wrap gap-2 border-t border-[#245747]/10 pt-4">
+                  <button
+                    type="submit"
+                    disabled={changesDisabled}
+                    className={primaryButton}
+                  >
+                    {busy
+                      ? "Saving…"
+                      : form.is_published
+                        ? "Save and publish"
+                        : "Save draft"}
                   </button>
 
                   <button
@@ -694,7 +810,7 @@ export default function ManageAnnouncementsPage() {
                         closePanel();
                       }
                     }}
-                    className="button-secondary"
+                    className={secondaryButton}
                   >
                     Cancel
                   </button>
@@ -707,60 +823,78 @@ export default function ManageAnnouncementsPage() {
                 <PublicationBadge published={selected.is_published} />
               </div>
 
-              <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+              <dl className="mt-5 grid gap-4 rounded-xl bg-[#FAF7F2] p-4 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="text-slate-500">Created · Nairobi</dt>
-                  <dd className="mt-1 text-slate-700">
+                  <dt className="text-xs text-[#78716C]">
+                    Created · Nairobi
+                  </dt>
+                  <dd className="mt-2 font-medium text-[#173F35]">
                     {formatDate(selected.created_at)}
                   </dd>
                 </div>
 
                 <div>
-                  <dt className="text-slate-500">Updated · Nairobi</dt>
-                  <dd className="mt-1 text-slate-700">
+                  <dt className="text-xs text-[#78716C]">
+                    Updated · Nairobi
+                  </dt>
+                  <dd className="mt-2 font-medium text-[#173F35]">
                     {formatDate(selected.updated_at)}
                   </dd>
                 </div>
               </dl>
 
-              <p className="mt-5 whitespace-pre-wrap break-words border-t border-slate-100 pt-5 text-sm leading-6 text-slate-600">
+              <h3 className="mt-5 text-sm font-semibold text-[#173F35]">
+                Message
+              </h3>
+
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#57534E]">
                 {selected.message}
               </p>
 
               {confirmDelete ? (
-                <div className="mt-5 rounded-xl bg-red-50 p-4">
-                  <p className="text-sm leading-6 text-red-900">
-                    Permanently delete “{selected.title}”? To keep a copy
-                    while hiding it from readers, edit it and untick Publish.
+                <div
+                  role="group"
+                  aria-labelledby="delete-notice-heading"
+                  aria-busy={busy}
+                  className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"
+                >
+                  <h3 id="delete-notice-heading" className="font-semibold">
+                    Delete this announcement permanently?
+                  </h3>
+
+                  <p className="mt-2 break-words leading-6">
+                    “{selected.title}” will be deleted. To keep a copy
+                    while hiding it from readers, edit it and uncheck
+                    Publish instead.
                   </p>
 
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={busy || needsCheck}
-                      className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
-                    >
-                      {busy ? "Deleting…" : "Confirm delete"}
-                    </button>
-
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(false)}
                       disabled={busy}
-                      className="button-secondary"
+                      className={secondaryButton}
                     >
                       Keep announcement
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={changesDisabled}
+                      className={`${buttonBase} bg-red-700 text-white hover:bg-red-800`}
+                    >
+                      {busy ? "Deleting…" : "Confirm delete"}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-[#245747]/10 pt-4">
                   <button
                     type="button"
                     onClick={startEditing}
-                    disabled={busy || needsCheck}
-                    className="button-primary"
+                    disabled={changesDisabled}
+                    className={primaryButton}
                   >
                     Edit announcement
                   </button>
@@ -768,8 +902,8 @@ export default function ManageAnnouncementsPage() {
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(true)}
-                    disabled={busy || needsCheck}
-                    className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    disabled={changesDisabled}
+                    className={dangerButton}
                   >
                     Delete
                   </button>

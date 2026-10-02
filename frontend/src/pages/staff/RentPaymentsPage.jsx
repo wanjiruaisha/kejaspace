@@ -34,13 +34,42 @@ const paymentStatuses = {
   },
   partially_paid: {
     label: "Partially paid",
-    classes: "bg-blue-50 text-blue-800",
+    classes: "bg-[#F5E8DE] text-[#965038]",
   },
   paid: {
     label: "Paid",
     classes: "bg-emerald-50 text-emerald-800",
   },
 };
+
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 " +
+  "rounded-xl px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#E8EDE4]";
+
+const inputClass =
+  "mt-2 min-h-11 w-full min-w-0 rounded-xl " +
+  "border border-[#245747]/20 bg-white px-3 py-2.5 " +
+  "text-sm text-[#173F35] placeholder:text-[#78716C] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-60";
+
+const labelClass = "block text-sm font-semibold text-[#173F35]";
+
+const panelClass =
+  "min-w-0 scroll-mt-24 rounded-2xl border border-[#245747]/20 " +
+  "bg-white p-4 sm:p-5 focus-visible:outline-2 " +
+  "focus-visible:outline-offset-4 focus-visible:outline-[#245747]";
 
 const currencyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",
@@ -61,7 +90,7 @@ function money(value) {
   return currencyFormatter.format(Number(value));
 }
 
-// Convert amounts to whole cents for exact comparisons.
+// Use whole cents when comparing amounts.
 function toCents(value) {
   const text = String(value ?? "").trim();
 
@@ -75,8 +104,12 @@ function toCents(value) {
 }
 
 function getErrorMessage(error) {
-  if (error.data && typeof error.data === "object") {
-    return Object.entries(error.data)
+  if (
+    error.data &&
+    typeof error.data === "object" &&
+    !Array.isArray(error.data)
+  ) {
+    const message = Object.entries(error.data)
       .map(([field, value]) => {
         const text = Array.isArray(value)
           ? value.join(" ")
@@ -87,6 +120,8 @@ function getErrorMessage(error) {
           : `${field.replaceAll("_", " ")}: ${text}`;
       })
       .join(" ");
+
+    if (message) return message;
   }
 
   return error.message || "Something went wrong.";
@@ -95,12 +130,13 @@ function getErrorMessage(error) {
 function PaymentBadge({ status }) {
   const details = paymentStatuses[status] || {
     label: "Unavailable",
-    classes: "bg-slate-100 text-slate-600",
+    classes: "bg-stone-100 text-stone-600",
   };
 
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${details.classes}`}
+      className={`inline-flex whitespace-nowrap rounded-full
+        px-2.5 py-1.5 text-xs font-medium ${details.classes}`}
     >
       {details.label}
     </span>
@@ -206,14 +242,20 @@ export default function RentPaymentsPage() {
     }
   }
 
+  // Also called internally after a successful save.
   function refreshCharges() {
     resetPanels();
     setLoading(true);
     setReload((value) => value + 1);
   }
 
-  function changePage(nextPage) {
+  function handleRefresh() {
     if (mutationLock.current || loading) return;
+    refreshCharges();
+  }
+
+  function changePage(nextPage) {
+    if (mutationLock.current || loading || nextPage < 1) return;
 
     resetPanels();
     setLoading(true);
@@ -267,7 +309,7 @@ export default function RentPaymentsPage() {
   }
 
   function viewDetails(charge, button) {
-    if (mutationLock.current) return;
+    if (mutationLock.current || loading) return;
 
     triggerRef.current = button;
     setSelectedCharge(charge);
@@ -279,7 +321,7 @@ export default function RentPaymentsPage() {
 
     setPaymentForm({
       ...emptyPayment,
-      amount: charge.payment_summary?.balance || "",
+      amount: String(charge.payment_summary?.balance ?? ""),
     });
   }
 
@@ -292,7 +334,6 @@ export default function RentPaymentsPage() {
       );
     } else {
       setNeedsReview(true);
-
       setActionError(
         "We could not confirm whether this was saved. Do not submit again yet. " +
           "Check the charge and recorded payments before continuing.",
@@ -325,9 +366,7 @@ export default function RentPaymentsPage() {
     const billingMonth = `${chargeForm.billing_month}-01`;
 
     if (!chargeForm.due_date || chargeForm.due_date < billingMonth) {
-      setActionError(
-        "The due date cannot be before the billing month.",
-      );
+      setActionError("The due date cannot be before the billing month.");
       return;
     }
 
@@ -353,11 +392,9 @@ export default function RentPaymentsPage() {
         throw new Error("Unexpected charge response.");
       }
 
-      // Clear filters so the new charge is not hidden by an old filter.
       setFilterForm({ ...defaultFilters });
       setFilters({ ...defaultFilters });
       setPage(1);
-
       setMessage(
         "Rent charge created successfully. Filters have been cleared.",
       );
@@ -388,16 +425,13 @@ export default function RentPaymentsPage() {
 
     const reference = paymentForm.reference.trim();
     const amount = paymentForm.amount.trim();
-
     const amountCents = toCents(amount);
-    const balanceCents = toCents(
+    const currentBalance = toCents(
       selectedCharge.payment_summary?.balance,
     );
 
     if (!reference) {
-      setActionError(
-        "Enter a receipt or bank transaction reference.",
-      );
+      setActionError("Enter a receipt or bank transaction reference.");
       return;
     }
 
@@ -408,17 +442,13 @@ export default function RentPaymentsPage() {
       return;
     }
 
-    if (balanceCents === null || balanceCents <= 0) {
-      setActionError(
-        "Refresh the charge to check its current balance.",
-      );
+    if (currentBalance === null || currentBalance <= 0) {
+      setActionError("Refresh the charge to check its current balance.");
       return;
     }
 
-    if (amountCents > balanceCents) {
-      setActionError(
-        "The payment cannot exceed the remaining balance.",
-      );
+    if (amountCents > currentBalance) {
+      setActionError("The payment cannot exceed the remaining balance.");
       return;
     }
 
@@ -426,9 +456,7 @@ export default function RentPaymentsPage() {
       selectedCharge.is_initial_rent &&
       amountCents !== toCents(selectedCharge.amount)
     ) {
-      setActionError(
-        "Initial rent must be paid in full in one payment.",
-      );
+      setActionError("Initial rent must be paid in full in one payment.");
       return;
     }
 
@@ -465,6 +493,13 @@ export default function RentPaymentsPage() {
     }
   }
 
+  function handlePanelKeyDown(event) {
+    if (event.key === "Escape" && !mutationLock.current) {
+      event.stopPropagation();
+      closePanel();
+    }
+  }
+
   const locked = busy || needsReview || loading;
 
   const balanceCents = selectedCharge
@@ -474,17 +509,35 @@ export default function RentPaymentsPage() {
   const hasBalance = balanceCents !== null && balanceCents > 0;
 
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Hostel management
+    <section
+      aria-labelledby="rent-heading"
+      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
+    >
+      <header
+        className="flex flex-wrap items-center justify-between
+          gap-4 rounded-2xl border border-[#245747]/10
+          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
+          to-[#DCE9DD] p-5 sm:p-6"
+      >
+        <div className="min-w-0">
+          <p
+            className="text-xs font-semibold uppercase
+              tracking-[0.14em] text-[#965038]"
+          >
+            Charges & records
           </p>
 
-          <h1 className="page-title mt-2">Rent & payments</h1>
+          <h1
+            id="rent-heading"
+            className="mt-2 font-heading text-2xl
+              font-bold tracking-tight text-[#173F35]"
+          >
+            Rent & payments
+          </h1>
 
-          <p className="page-description">
-            Review rent charges and record cash or bank payments received.
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
+            Check rent balances, create monthly charges and record
+            cash or bank payments received.
           </p>
         </div>
 
@@ -492,9 +545,10 @@ export default function RentPaymentsPage() {
           <button
             type="button"
             disabled={busy || loading}
-            onClick={refreshCharges}
-            className="button-secondary"
+            onClick={handleRefresh}
+            className={secondaryButton}
           >
+            <span aria-hidden="true">↻</span>
             Refresh
           </button>
 
@@ -502,8 +556,9 @@ export default function RentPaymentsPage() {
             type="button"
             disabled={locked}
             onClick={(event) => startCreating(event.currentTarget)}
-            className="button-primary"
+            className={primaryButton}
           >
+            <span aria-hidden="true">+</span>
             Create charge
           </button>
         </div>
@@ -512,7 +567,8 @@ export default function RentPaymentsPage() {
       {message && (
         <p
           role="status"
-          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="rounded-xl border border-emerald-100
+            bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {message}
         </p>
@@ -521,7 +577,8 @@ export default function RentPaymentsPage() {
       {actionError && (
         <div
           role="alert"
-          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-xl border border-amber-200
+            bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -529,84 +586,81 @@ export default function RentPaymentsPage() {
             <div className="mt-3 space-y-2">
               <p>
                 Submissions are paused on this page. Review the recorded
-                payments and refresh the charges before reopening it.
+                payments and refresh the charges. Reopen the page only
+                after checking whether the earlier action succeeded.
               </p>
 
-              <Link
-                to="/staff/reports/payments"
-                className="inline-block font-semibold underline"
-              >
-                Open payment report
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  to="/staff/reports/payments"
+                  className="inline-flex min-h-11 items-center
+                    rounded-lg font-semibold underline underline-offset-4"
+                >
+                  Open payment report
+                </Link>
+
+                <button
+                  type="button"
+                  disabled={busy || loading}
+                  onClick={handleRefresh}
+                  className={secondaryButton}
+                >
+                  Refresh charges
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      <form
-        onSubmit={applyFilters}
-        className="rounded-2xl border border-slate-200 bg-white p-4"
-      >
-        <fieldset disabled={busy || loading}>
-          <legend className="text-sm font-semibold text-slate-900">
+      {/* Search, filters and ordering */}
+      <form onSubmit={applyFilters} className={panelClass}>
+        <fieldset disabled={busy || loading} className="min-w-0">
+          <legend className="font-heading text-base font-semibold text-[#173F35]">
             Find rent charges
           </legend>
 
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <label htmlFor="charge-search" className="form-label">
-                Search room
-              </label>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                name: "search",
+                label: "Search room",
+                type: "search",
+                placeholder: "For example: A101",
+              },
+              {
+                name: "billing_month",
+                label: "Billing month",
+                type: "month",
+              },
+              {
+                name: "due_date",
+                label: "Due date",
+                type: "date",
+              },
+            ].map((field) => (
+              <div key={field.name} className="min-w-0">
+                <label
+                  htmlFor={`filter-${field.name}`}
+                  className={labelClass}
+                >
+                  {field.label}
+                </label>
 
-              <input
-                id="charge-search"
-                name="search"
-                type="search"
-                value={filterForm.search}
-                onChange={updateFilterForm}
-                placeholder="For example: A101"
-                className="form-input"
-              />
-            </div>
+                <input
+                  id={`filter-${field.name}`}
+                  name={field.name}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={filterForm[field.name]}
+                  onChange={updateFilterForm}
+                  className={inputClass}
+                />
+              </div>
+            ))}
 
-            <div>
-              <label
-                htmlFor="charge-filter-month"
-                className="form-label"
-              >
-                Billing month
-              </label>
-
-              <input
-                id="charge-filter-month"
-                name="billing_month"
-                type="month"
-                value={filterForm.billing_month}
-                onChange={updateFilterForm}
-                className="form-input"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="charge-filter-due"
-                className="form-label"
-              >
-                Due date
-              </label>
-
-              <input
-                id="charge-filter-due"
-                name="due_date"
-                type="date"
-                value={filterForm.due_date}
-                onChange={updateFilterForm}
-                className="form-input"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="charge-ordering" className="form-label">
+            <div className="min-w-0">
+              <label htmlFor="charge-ordering" className={labelClass}>
                 Sort by
               </label>
 
@@ -615,7 +669,7 @@ export default function RentPaymentsPage() {
                 name="ordering"
                 value={filterForm.ordering}
                 onChange={updateFilterForm}
-                className="form-input"
+                className={inputClass}
               >
                 <option value="-billing_month,-id">
                   Latest billing month
@@ -623,31 +677,23 @@ export default function RentPaymentsPage() {
                 <option value="billing_month,id">
                   Earliest billing month
                 </option>
-                <option value="amount,id">
-                  Charge amount: low to high
-                </option>
-                <option value="-amount,-id">
-                  Charge amount: high to low
-                </option>
-                <option value="due_date,id">
-                  Earliest due date
-                </option>
-                <option value="-due_date,-id">
-                  Latest due date
-                </option>
+                <option value="amount,id">Amount: low to high</option>
+                <option value="-amount,-id">Amount: high to low</option>
+                <option value="due_date,id">Earliest due date</option>
+                <option value="-due_date,-id">Latest due date</option>
               </select>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button type="submit" className="button-primary">
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="submit" className={primaryButton}>
               Apply filters
             </button>
 
             <button
               type="button"
               onClick={clearFilters}
-              className="button-secondary"
+              className={secondaryButton}
             >
               Clear filters
             </button>
@@ -655,307 +701,228 @@ export default function RentPaymentsPage() {
         </fieldset>
       </form>
 
+      {/* Charge list */}
       {loading ? (
-        <p
-          role="status"
-          className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600"
-        >
+        <p role="status" className={`${panelClass} text-sm text-[#57534E]`}>
           Loading charges…
         </p>
       ) : error ? (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 p-4 text-sm text-red-800"
+          className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-800"
         >
           <p>{error}</p>
-
           <button
             type="button"
-            onClick={refreshCharges}
+            onClick={handleRefresh}
             disabled={busy}
-            className="mt-3 font-semibold underline"
+            className="mt-2 inline-flex min-h-11 items-center
+              rounded-lg font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : charges.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div
+          className="rounded-2xl border border-dashed
+            border-[#245747]/25 bg-white px-5 py-9 text-center"
+        >
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
             No charges found
           </h2>
-
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
             No charges match this view. Try clearing the filters.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
-              <caption className="sr-only">
-                Rent charges, remaining balances and payment status
-              </caption>
+        <div className="space-y-3">
+          {charges.map((charge) => {
+            const selected = selectedCharge?.id === charge.id;
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="w-[21%] px-4 py-3">
-                    Resident
-                  </th>
-                  <th scope="col" className="w-[8%] px-4 py-3">
-                    Room
-                  </th>
-                  <th scope="col" className="w-[11%] px-4 py-3">
-                    Month
-                  </th>
-                  <th
-                    scope="col"
-                    className="w-[16%] px-4 py-3 text-right"
-                  >
-                    Charge
-                  </th>
-                  <th
-                    scope="col"
-                    className="w-[16%] px-4 py-3 text-right"
-                  >
-                    Balance
-                  </th>
-                  <th scope="col" className="w-[15%] px-4 py-3">
-                    Status
-                  </th>
-                  <th scope="col" className="w-[13%] px-4 py-3">
-                    Details
-                  </th>
-                </tr>
-              </thead>
+            return (
+              <article
+                key={charge.id}
+                className={`min-w-0 rounded-2xl border p-4 sm:p-5 ${
+                  selected
+                    ? "border-[#245747]/40 bg-[#EDF3E8]"
+                    : "border-[#245747]/15 bg-white"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#78716C]">
+                      Charge #{charge.id} · Room {charge.room_number}
+                    </p>
 
-              <tbody className="divide-y divide-slate-100">
-                {charges.map((charge) => (
-                  <tr
-                    key={charge.id}
-                    className={
-                      selectedCharge?.id === charge.id
-                        ? "bg-blue-50/60"
-                        : "hover:bg-slate-50"
-                    }
-                  >
-                    <th
-                      scope="row"
-                      className="px-4 py-3 font-medium text-slate-900"
+                    <h2
+                      className="mt-1 break-words font-heading
+                        text-base font-semibold text-[#173F35]"
                     >
-                      <p
-                        className="truncate"
-                        title={charge.resident_username}
-                      >
-                        {charge.resident_username || "Unavailable"}
-                      </p>
+                      {charge.resident_username || "Resident unavailable"}
+                    </h2>
+                  </div>
 
-                      <p className="mt-1 text-xs font-normal text-slate-500">
-                        Charge #{charge.id}
-                      </p>
-                    </th>
+                  <PaymentBadge status={charge.payment_summary?.status} />
+                </div>
 
-                    <td className="px-4 py-3 text-slate-600">
-                      <p className="truncate" title={charge.room_number}>
-                        {charge.room_number}
-                      </p>
-                    </td>
+                <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+                  <dl className="grid flex-1 grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+                    {[
+                      ["Billing month", charge.billing_month?.slice(0, 7)],
+                      ["Due date", charge.due_date],
+                      ["Charge", money(charge.amount)],
+                      ["Balance", money(charge.payment_summary?.balance)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0">
+                        <dt className="text-xs text-[#78716C]">{label}</dt>
+                        <dd
+                          className={`mt-1 break-words tabular-nums ${
+                            label === "Balance"
+                              ? "font-bold text-[#245747]"
+                              : "font-medium text-[#173F35]"
+                          }`}
+                        >
+                          {value ?? "Unavailable"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
-                    <td className="px-4 py-3 text-xs text-slate-600">
-                      {charge.billing_month?.slice(0, 7)}
-                    </td>
-
-                    <td className="px-4 py-3 text-right text-xs tabular-nums text-slate-700">
-                      {money(charge.amount)}
-                    </td>
-
-                    <td className="px-4 py-3 text-right text-xs font-semibold tabular-nums text-slate-900">
-                      {money(charge.payment_summary?.balance)}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <PaymentBadge
-                        status={charge.payment_summary?.status}
-                      />
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={(event) =>
-                          viewDetails(charge, event.currentTarget)
-                        }
-                        aria-label={`View details for charge ${charge.id}`}
-                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={(event) =>
+                      viewDetails(charge, event.currentTarget)
+                    }
+                    aria-label={`View details for charge #${charge.id}`}
+                    aria-expanded={selected}
+                    aria-controls={selected ? "charge-details" : undefined}
+                    className={secondaryButton}
+                  >
+                    View details <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
-      <nav
-        aria-label="Charge pages"
-        className="flex items-center justify-between gap-3"
-      >
-        <button
-          type="button"
-          disabled={loading || busy || page === 1}
-          onClick={() => changePage(page - 1)}
-          className="button-secondary"
-        >
-          Previous
-        </button>
-
-        <span className="text-sm text-slate-500">Page {page}</span>
-
-        <button
-          type="button"
-          disabled={loading || busy || Boolean(error) || !hasNext}
-          onClick={() => changePage(page + 1)}
-          className="button-secondary"
-        >
-          Next
-        </button>
-      </nav>
-
+      {/* Create a later monthly charge */}
       {showCreate && (
         <section
           ref={panelRef}
           tabIndex={-1}
           aria-labelledby="create-charge-title"
-          className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+          onKeyDown={handlePanelKeyDown}
+          className={panelClass}
         >
-          <div className="flex items-start justify-between gap-4">
-            <h2
-              id="create-charge-title"
-              className="font-heading text-base font-semibold text-slate-900"
-            >
-              Create monthly charge
-            </h2>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-[#965038]">
+                Monthly billing
+              </p>
+              <h2
+                id="create-charge-title"
+                className="mt-1 font-heading text-lg font-semibold text-[#173F35]"
+              >
+                Create a rent charge
+              </h2>
+            </div>
 
             <button
               type="button"
               disabled={busy}
               onClick={closePanel}
-              className="button-secondary"
+              className={secondaryButton}
             >
               Close
             </button>
           </div>
 
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Approval already creates the initial rent charge. Use this
-            form for later months of a reserved or checked-in stay.
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#57534E]">
+            Approval already creates the initial rent charge. Use this form
+            for later months of a reserved or checked-in stay.
           </p>
 
-          <form onSubmit={handleCreate}>
+          <form onSubmit={handleCreate} aria-busy={busy}>
             <fieldset
               disabled={locked}
-              className="mt-5 grid gap-4 sm:grid-cols-2"
+              className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"
             >
-              <div>
-                <label htmlFor="stay-id" className="form-label">
-                  Stay ID
-                </label>
+              <legend className="sr-only">New charge details</legend>
 
-                <input
-                  id="stay-id"
-                  type="number"
-                  min="1"
-                  step="1"
-                  required
-                  value={chargeForm.stay}
-                  onChange={(event) =>
-                    setChargeForm({
-                      ...chargeForm,
-                      stay: event.target.value,
-                    })
-                  }
-                  className="form-input"
-                />
+              {[
+                {
+                  name: "stay",
+                  label: "Stay ID",
+                  type: "number",
+                  min: "1",
+                  step: "1",
+                },
+                {
+                  name: "billing_month",
+                  label: "Billing month",
+                  type: "month",
+                },
+                {
+                  name: "amount",
+                  label: "Rent amount (KES)",
+                  type: "number",
+                  min: "0.01",
+                  step: "0.01",
+                },
+                {
+                  name: "due_date",
+                  label: "Due date",
+                  type: "date",
+                  min: chargeForm.billing_month
+                    ? `${chargeForm.billing_month}-01`
+                    : undefined,
+                },
+              ].map((field) => (
+                <div key={field.name} className="min-w-0">
+                  <label
+                    htmlFor={`create-${field.name}`}
+                    className={labelClass}
+                  >
+                    {field.label}
+                  </label>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Use the stay’s ID, not the resident or room ID.
-                </p>
-              </div>
+                  <input
+                    id={`create-${field.name}`}
+                    name={field.name}
+                    type={field.type}
+                    min={field.min}
+                    step={field.step}
+                    required
+                    value={chargeForm[field.name]}
+                    onChange={(event) =>
+                      setChargeForm((previous) => ({
+                        ...previous,
+                        [field.name]: event.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  />
 
-              <div>
-                <label htmlFor="billing-month" className="form-label">
-                  Billing month
-                </label>
+                  {field.name === "stay" && (
+                    <p className="mt-2 text-xs leading-5 text-[#78716C]">
+                      Find the stay ID on the Resident stays page.
+                    </p>
+                  )}
+                </div>
+              ))}
 
-                <input
-                  id="billing-month"
-                  type="month"
-                  required
-                  value={chargeForm.billing_month}
-                  onChange={(event) =>
-                    setChargeForm({
-                      ...chargeForm,
-                      billing_month: event.target.value,
-                    })
-                  }
-                  className="form-input"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="charge-amount" className="form-label">
-                  Rent amount (KES)
-                </label>
-
-                <input
-                  id="charge-amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  value={chargeForm.amount}
-                  onChange={(event) =>
-                    setChargeForm({
-                      ...chargeForm,
-                      amount: event.target.value,
-                    })
-                  }
-                  className="form-input"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="due-date" className="form-label">
-                  Due date
-                </label>
-
-                <input
-                  id="due-date"
-                  type="date"
-                  required
-                  value={chargeForm.due_date}
-                  onChange={(event) =>
-                    setChargeForm({
-                      ...chargeForm,
-                      due_date: event.target.value,
-                    })
-                  }
-                  className="form-input"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-3 sm:col-span-2">
-                <button type="submit" className="button-primary">
+              <div className="flex flex-wrap gap-2 sm:col-span-2">
+                <button type="submit" className={primaryButton}>
                   {busy ? "Saving…" : "Save charge"}
                 </button>
 
                 <button
                   type="button"
                   onClick={closePanel}
-                  className="button-secondary"
+                  className={secondaryButton}
                 >
                   Cancel
                 </button>
@@ -965,25 +932,32 @@ export default function RentPaymentsPage() {
         </section>
       )}
 
+      {/* Selected charge and manual payment form */}
       {selectedCharge && !loading && !error && (
         <section
+          id="charge-details"
           ref={panelRef}
           tabIndex={-1}
           aria-labelledby="charge-details-title"
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+          onKeyDown={handlePanelKeyDown}
+          className={panelClass}
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#965038]">
+                Charge #{selectedCharge.id}
+              </p>
+
               <h2
                 id="charge-details-title"
-                className="font-heading text-base font-semibold text-slate-900"
+                className="mt-1 break-words font-heading
+                  text-lg font-semibold text-[#173F35]"
               >
-                Charge #{selectedCharge.id}
+                {selectedCharge.resident_username || "Resident unavailable"}
               </h2>
 
-              <p className="mt-2 break-words text-sm text-slate-600">
-                {selectedCharge.resident_username} · Room{" "}
-                {selectedCharge.room_number}
+              <p className="mt-1 text-sm text-[#57534E]">
+                Room {selectedCharge.room_number}
               </p>
 
               <div className="mt-3">
@@ -997,52 +971,57 @@ export default function RentPaymentsPage() {
               type="button"
               disabled={busy}
               onClick={closePanel}
-              className="button-secondary"
+              className={`${secondaryButton} shrink-0`}
             >
               Close
             </button>
           </div>
 
-          <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <dl
+            className="mt-5 grid gap-4 rounded-xl
+              bg-[#FAF7F2] p-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {[
               ["Stay ID", selectedCharge.stay],
-              [
-                "Billing month",
-                selectedCharge.billing_month?.slice(0, 7),
-              ],
+              ["Billing month", selectedCharge.billing_month?.slice(0, 7)],
               ["Due date", selectedCharge.due_date],
               ["Charge amount", money(selectedCharge.amount)],
-              [
-                "Amount paid",
-                money(selectedCharge.payment_summary?.amount_paid),
-              ],
-              [
-                "Balance",
-                money(selectedCharge.payment_summary?.balance),
-              ],
+              ["Amount paid", money(selectedCharge.payment_summary?.amount_paid)],
+              ["Balance", money(selectedCharge.payment_summary?.balance)],
               [
                 "Charge type",
-                selectedCharge.is_initial_rent
-                  ? "Initial rent"
-                  : "Monthly rent",
+                selectedCharge.is_initial_rent ? "Initial rent" : "Monthly rent",
               ],
             ].map(([label, value]) => (
               <div key={label} className="min-w-0">
-                <dt className="text-xs text-slate-500">{label}</dt>
-                <dd className="mt-1 break-words text-sm font-medium text-slate-800">
-                  {value}
+                <dt className="text-xs text-[#78716C]">{label}</dt>
+                <dd className="mt-1 break-words text-sm font-semibold text-[#173F35]">
+                  {value ?? "Unavailable"}
                 </dd>
               </div>
             ))}
           </dl>
 
+          {balanceCents === null && (
+            <p className="mt-4 text-sm leading-6 text-amber-800">
+              The balance is unavailable. Refresh the charge before
+              recording a payment.
+            </p>
+          )}
+
+          {balanceCents === 0 && (
+            <p className="mt-4 text-sm font-medium text-[#245747]">
+              This charge has no remaining balance.
+            </p>
+          )}
+
           {hasBalance && !showPayment && (
-            <div className="mt-5 border-t border-slate-100 pt-5">
+            <div className="mt-5 border-t border-[#245747]/10 pt-4">
               <button
                 type="button"
                 disabled={locked}
                 onClick={() => setShowPayment(true)}
-                className="button-primary"
+                className={primaryButton}
               >
                 Record payment
               </button>
@@ -1052,13 +1031,14 @@ export default function RentPaymentsPage() {
           {hasBalance && showPayment && (
             <form
               onSubmit={handlePayment}
-              className="mt-5 border-t border-slate-100 pt-5"
+              aria-busy={busy}
+              className="mt-5 border-t border-[#245747]/10 pt-5"
             >
-              <h3 className="text-sm font-semibold text-slate-900">
+              <h3 className="font-heading text-base font-semibold text-[#173F35]">
                 Record received payment
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[#57534E]">
                 Record only confirmed cash or bank payments.
                 {selectedCharge.is_initial_rent &&
                   " Initial rent requires full payment before the hold expires."}
@@ -1066,16 +1046,14 @@ export default function RentPaymentsPage() {
 
               <fieldset
                 disabled={locked}
-                className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
               >
-                <div>
-                  <label
-                    htmlFor="payment-amount"
-                    className="form-label"
-                  >
+                <legend className="sr-only">Payment details</legend>
+
+                <div className="min-w-0">
+                  <label htmlFor="payment-amount" className={labelClass}>
                     Amount received (KES)
                   </label>
-
                   <input
                     id="payment-amount"
                     type="number"
@@ -1085,71 +1063,64 @@ export default function RentPaymentsPage() {
                     required
                     value={paymentForm.amount}
                     onChange={(event) =>
-                      setPaymentForm({
-                        ...paymentForm,
+                      setPaymentForm((previous) => ({
+                        ...previous,
                         amount: event.target.value,
-                      })
+                      }))
                     }
-                    className="form-input"
+                    className={inputClass}
                   />
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="payment-method"
-                    className="form-label"
-                  >
-                    Method
+                <div className="min-w-0">
+                  <label htmlFor="payment-method" className={labelClass}>
+                    Payment method
                   </label>
-
                   <select
                     id="payment-method"
                     value={paymentForm.method}
                     onChange={(event) =>
-                      setPaymentForm({
-                        ...paymentForm,
+                      setPaymentForm((previous) => ({
+                        ...previous,
                         method: event.target.value,
-                      })
+                      }))
                     }
-                    className="form-input"
+                    className={inputClass}
                   >
                     <option value="cash">Cash</option>
                     <option value="bank">Bank transfer</option>
                   </select>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="payment-reference"
-                    className="form-label"
-                  >
+                <div className="min-w-0">
+                  <label htmlFor="payment-reference" className={labelClass}>
                     Receipt / transaction reference
                   </label>
-
                   <input
                     id="payment-reference"
+                    type="text"
                     required
                     maxLength={100}
                     value={paymentForm.reference}
                     onChange={(event) =>
-                      setPaymentForm({
-                        ...paymentForm,
+                      setPaymentForm((previous) => ({
+                        ...previous,
                         reference: event.target.value,
-                      })
+                      }))
                     }
-                    className="form-input"
+                    className={inputClass}
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-3 sm:col-span-2 lg:col-span-3">
-                  <button type="submit" className="button-primary">
+                <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
+                  <button type="submit" className={primaryButton}>
                     {busy ? "Recording…" : "Save payment"}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setShowPayment(false)}
-                    className="button-secondary"
+                    className={secondaryButton}
                   >
                     Cancel
                   </button>
@@ -1159,6 +1130,31 @@ export default function RentPaymentsPage() {
           )}
         </section>
       )}
+
+      <nav
+        aria-label="Charge pages"
+        className="flex items-center justify-between gap-3"
+      >
+        <button
+          type="button"
+          disabled={loading || busy || page === 1}
+          onClick={() => changePage(page - 1)}
+          className={secondaryButton}
+        >
+          Previous
+        </button>
+
+        <span className="text-sm text-[#57534E]">Page {page}</span>
+
+        <button
+          type="button"
+          disabled={loading || busy || Boolean(error) || !hasNext}
+          onClick={() => changePage(page + 1)}
+          className={secondaryButton}
+        >
+          Next
+        </button>
+      </nav>
     </section>
   );
 }

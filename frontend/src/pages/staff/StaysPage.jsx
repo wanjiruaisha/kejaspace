@@ -13,7 +13,7 @@ const statusDetails = {
   },
   reserved: {
     label: "Reserved",
-    classes: "bg-blue-50 text-blue-800",
+    classes: "bg-[#E8EDE4] text-[#245747]",
   },
   checked_in: {
     label: "Checked in",
@@ -21,7 +21,7 @@ const statusDetails = {
   },
   checked_out: {
     label: "Checked out",
-    classes: "bg-slate-100 text-slate-700",
+    classes: "bg-stone-100 text-stone-700",
   },
   cancelled: {
     label: "Cancelled",
@@ -29,7 +29,7 @@ const statusDetails = {
   },
   expired: {
     label: "Expired",
-    classes: "bg-slate-100 text-slate-700",
+    classes: "bg-stone-100 text-stone-700",
   },
 };
 
@@ -60,6 +60,24 @@ const allowedActions = {
   checked_in: ["check-out"],
 };
 
+const buttonBase =
+  "inline-flex min-h-11 items-center justify-center gap-2 " +
+  "rounded-xl px-4 py-2 text-sm font-semibold transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-[#245747] " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+const primaryButton =
+  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+
+const secondaryButton =
+  `${buttonBase} border border-[#245747]/20 bg-white ` +
+  "text-[#245747] hover:bg-[#E8EDE4]";
+
+const dangerButton =
+  `${buttonBase} border border-red-200 bg-white ` +
+  "text-red-700 hover:bg-red-50";
+
 function formatTimestamp(value, fallback = "Not yet") {
   if (!value) return fallback;
 
@@ -89,12 +107,13 @@ function getErrorMessage(error) {
 function StatusBadge({ status }) {
   const details = statusDetails[status] || {
     label: status,
-    classes: "bg-slate-100 text-slate-700",
+    classes: "bg-stone-100 text-stone-700",
   };
 
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${details.classes}`}
+      className={`inline-flex whitespace-nowrap rounded-full
+        px-2.5 py-1.5 text-xs font-medium ${details.classes}`}
     >
       {details.label}
     </span>
@@ -167,14 +186,13 @@ export default function StaysPage() {
   }, [page, status, retry]);
 
   useEffect(() => {
-    if (selectedStay) {
-      detailsRef.current?.focus({ preventScroll: true });
+    if (!selectedStay) return;
 
-      detailsRef.current?.scrollIntoView({
-        block: "nearest",
-        behavior: "auto",
-      });
-    }
+    detailsRef.current?.focus({ preventScroll: true });
+    detailsRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "auto",
+    });
   }, [selectedStay]);
 
   function resetDetails() {
@@ -183,7 +201,7 @@ export default function StaysPage() {
   }
 
   function openDetails(stay, button) {
-    if (mutationRef.current) return;
+    if (mutationRef.current || loading) return;
 
     triggerRef.current = button;
     setSelectedStay(stay);
@@ -203,10 +221,16 @@ export default function StaysPage() {
     }
   }
 
-  function refreshList() {
+  // Used internally after mutations as well as by the Refresh button.
+  function reloadStays() {
     resetDetails();
     setLoading(true);
     setRetry((value) => value + 1);
+  }
+
+  function handleRefresh() {
+    if (mutationRef.current || loading) return;
+    reloadStays();
   }
 
   function openConfirmation(stay, action) {
@@ -221,10 +245,7 @@ export default function StaysPage() {
 
     setActionError("");
     setSuccessMessage("");
-    setConfirmation({
-      stayId: stay.id,
-      action,
-    });
+    setConfirmation({ stayId: stay.id, action });
   }
 
   async function handleConfirm() {
@@ -240,7 +261,13 @@ export default function StaysPage() {
     const { stayId, action } = confirmation;
     const details = actionDetails[action];
 
-    if (!details) return;
+    if (
+      !details ||
+      selectedStay?.id !== stayId ||
+      !(allowedActions[selectedStay.status] || []).includes(action)
+    ) {
+      return;
+    }
 
     mutationRef.current = true;
     setBusy(true);
@@ -254,19 +281,17 @@ export default function StaysPage() {
         updated?.id !== stayId ||
         updated.status !== details.result
       ) {
-        throw new Error(
-          "The server returned an unexpected action result.",
-        );
+        throw new Error("The server returned an unexpected action result.");
       }
 
       setSuccessMessage(
         `Stay #${stayId}: ${statusDetails[updated.status].label}.`,
       );
 
-      // Reload because the new status may not match the current filter.
+      // The updated stay may no longer match the selected filter.
       setNeedsRefresh(true);
       setPage(1);
-      refreshList();
+      reloadStays();
     } catch (error) {
       setConfirmation(null);
 
@@ -279,11 +304,10 @@ export default function StaysPage() {
 
         if (error.status === 400 || error.status === 404) {
           setNeedsRefresh(true);
-          refreshList();
+          reloadStays();
         }
       } else {
         setNeedsRefresh(true);
-
         setActionError(
           "We could not confirm the action. Refresh the list and check " +
             "the stay’s current status before trying again.",
@@ -296,20 +320,27 @@ export default function StaysPage() {
   }
 
   function changePage(nextPage) {
+    if (
+      mutationRef.current ||
+      loading ||
+      needsRefresh ||
+      nextPage < 1
+    ) {
+      return;
+    }
+
     resetDetails();
-
-    if (!needsRefresh) setActionError("");
-
+    setActionError("");
     setSuccessMessage("");
     setLoading(true);
     setPage(nextPage);
   }
 
   function changeFilter(event) {
+    if (mutationRef.current || loading || needsRefresh) return;
+
     resetDetails();
-
-    if (!needsRefresh) setActionError("");
-
+    setActionError("");
     setSuccessMessage("");
     setLoading(true);
     setStatus(event.target.value);
@@ -320,35 +351,68 @@ export default function StaysPage() {
     ? allowedActions[selectedStay.status] || []
     : [];
 
+  const controlsDisabled = loading || busy || needsRefresh;
+
+  function renderDetailsButton(stay) {
+    const isSelected = selectedStay?.id === stay.id;
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => openDetails(stay, event.currentTarget)}
+        disabled={busy}
+        aria-label={`View details for ${getResidentName(stay)}, stay #${stay.id}`}
+        aria-expanded={isSelected}
+        aria-controls={isSelected ? "stay-details" : undefined}
+        className="inline-flex min-h-11 items-center gap-2
+          rounded-lg px-2 text-xs font-semibold text-[#245747]
+          transition-colors hover:bg-[#E8EDE4]
+          focus-visible:outline-2 focus-visible:outline-offset-2
+          focus-visible:outline-[#245747]
+          disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        View details
+        <span aria-hidden="true">→</span>
+      </button>
+    );
+  }
+
   return (
-    <section className="min-w-0 space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-            Hostel management
-          </p>
-
-          <h1 className="page-title mt-2">Resident stays</h1>
-
-          <p className="page-description">
-            Manage room allocations, resident arrivals and departures.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={refreshList}
-          disabled={loading || busy}
-          className="button-secondary"
+    <section
+      aria-labelledby="stays-heading"
+      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
+    >
+      <header
+        className="rounded-2xl border border-[#245747]/10
+          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
+          to-[#DCE9DD] p-5 sm:p-6"
+      >
+        <p
+          className="text-xs font-semibold uppercase
+            tracking-[0.14em] text-[#965038]"
         >
-          Refresh
-        </button>
+          Arrivals & departures
+        </p>
+
+        <h1
+          id="stays-heading"
+          className="mt-2 font-heading text-2xl
+            font-bold tracking-tight text-[#173F35]"
+        >
+          Resident stays
+        </h1>
+
+        <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
+          Keep track of room allocations, welcome arriving residents
+          and record departures.
+        </p>
       </header>
 
       {successMessage && (
         <p
           role="status"
-          className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="rounded-xl border border-emerald-100
+            bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
         >
           {successMessage}
         </p>
@@ -357,16 +421,19 @@ export default function StaysPage() {
       {actionError && (
         <div
           role="alert"
-          className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-xl border border-amber-200
+            bg-amber-50 p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
           {needsRefresh && (
             <button
               type="button"
-              onClick={refreshList}
+              onClick={handleRefresh}
               disabled={loading || busy}
-              className="mt-3 font-semibold underline disabled:opacity-50"
+              className="mt-2 inline-flex min-h-11 items-center
+                rounded-lg font-semibold underline underline-offset-4
+                disabled:opacity-50"
             >
               Refresh stays
             </button>
@@ -374,18 +441,31 @@ export default function StaysPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="w-full sm:max-w-xs">
-          <label htmlFor="stay-status-filter" className="form-label">
-            Filter by status
+      {/* Filter */}
+      <div
+        className="flex flex-wrap items-end justify-between
+          gap-4 rounded-2xl border border-[#245747]/15
+          bg-white p-4 sm:p-5"
+      >
+        <div className="w-full sm:w-64">
+          <label
+            htmlFor="stay-status-filter"
+            className="block text-sm font-semibold text-[#173F35]"
+          >
+            Stay status
           </label>
 
           <select
             id="stay-status-filter"
             value={status}
-            disabled={loading || busy}
+            disabled={controlsDisabled}
             onChange={changeFilter}
-            className="form-input"
+            className="mt-2 min-h-11 w-full rounded-xl
+              border border-[#245747]/20 bg-[#FAF7F2]/60
+              px-3 py-2.5 text-sm text-[#173F35]
+              focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-[#245747]
+              disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="">All stays</option>
 
@@ -396,168 +476,223 @@ export default function StaysPage() {
             ))}
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={loading || busy}
+          className={secondaryButton}
+        >
+          <span aria-hidden="true">↻</span>
+          Refresh
+        </button>
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-2xl border border-[#245747]/15 bg-white p-5">
           <LoadingMessage label="Loading resident stays…" compact />
         </div>
       ) : listError ? (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 p-5 text-sm text-red-800"
+          className="rounded-2xl border border-red-100
+            bg-red-50 p-5 text-sm leading-6 text-red-800"
         >
           <p>{listError}</p>
 
           <button
             type="button"
-            onClick={refreshList}
+            onClick={handleRefresh}
             disabled={busy}
-            className="mt-3 font-semibold underline"
+            className="mt-2 inline-flex min-h-11 items-center
+              rounded-lg font-semibold underline underline-offset-4"
           >
             Try again
           </button>
         </div>
       ) : stays.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div
+          className="rounded-2xl border border-dashed
+            border-[#245747]/25 bg-white px-5 py-9 text-center"
+        >
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
             No stays found
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
             No resident stays match the selected status.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] table-fixed text-left text-sm">
-              <caption className="sr-only">
-                Resident stays, allocated rooms and current status
-              </caption>
+        <>
+          {/* Mobile list */}
+          <div className="space-y-3 md:hidden">
+            {stays.map((stay) => (
+              <article
+                key={stay.id}
+                className={`rounded-2xl border p-4 ${
+                  selectedStay?.id === stay.id
+                    ? "border-[#245747]/40 bg-[#EDF3E8]"
+                    : "border-[#245747]/15 bg-white"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#78716C]">
+                      Stay #{stay.id}
+                    </p>
 
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th scope="col" className="w-[30%] px-4 py-3">
-                    Resident
-                  </th>
-                  <th scope="col" className="w-[12%] px-4 py-3">
-                    Room
-                  </th>
-                  <th scope="col" className="w-[23%] px-4 py-3">
-                    Status
-                  </th>
-                  <th scope="col" className="w-[20%] px-4 py-3">
-                    Checked in
-                  </th>
-                  <th scope="col" className="w-[15%] px-4 py-3">
-                    Details
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {stays.map((stay) => (
-                  <tr
-                    key={stay.id}
-                    className={
-                      selectedStay?.id === stay.id
-                        ? "bg-blue-50/60"
-                        : "hover:bg-slate-50"
-                    }
-                  >
-                    <th
-                      scope="row"
-                      className="px-4 py-3 font-medium text-slate-900"
+                    <h2
+                      className="mt-1 break-words font-heading
+                        text-base font-semibold text-[#173F35]"
                     >
-                      <p
-                        className="truncate"
-                        title={getResidentName(stay)}
-                      >
-                        {getResidentName(stay)}
-                      </p>
+                      {getResidentName(stay)}
+                    </h2>
+                  </div>
 
-                      <p className="mt-1 text-xs font-normal text-slate-500">
-                        Stay #{stay.id}
-                      </p>
-                    </th>
+                  <StatusBadge status={stay.status} />
+                </div>
 
-                    <td className="px-4 py-3 text-slate-600">
-                      <p className="truncate" title={stay.room_number}>
-                        {stay.room_number}
-                      </p>
-                    </td>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-[#78716C]">Room</dt>
+                    <dd className="mt-1 break-words font-medium text-[#173F35]">
+                      {stay.room_number}
+                    </dd>
+                  </div>
 
-                    <td className="px-4 py-3">
-                      <StatusBadge status={stay.status} />
-                    </td>
+                  <div>
+                    <dt className="text-xs text-[#78716C]">Checked in</dt>
+                    <dd className="mt-1 text-xs leading-5 text-[#57534E]">
+                      {formatTimestamp(stay.check_in_at, "Not yet")}
+                    </dd>
+                  </div>
+                </dl>
 
-                    <td className="px-4 py-3 text-xs leading-5 text-slate-500">
-                      {formatTimestamp(stay.check_in_at, "—")}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={(event) =>
-                          openDetails(stay, event.currentTarget)
-                        }
-                        disabled={busy}
-                        aria-label={`View details for stay ${stay.id}`}
-                        className="rounded-lg px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        View details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                <div className="mt-3 border-t border-[#245747]/10 pt-2">
+                  {renderDetailsButton(stay)}
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+
+          {/* Desktop table */}
+          <div
+            className="hidden overflow-hidden rounded-2xl
+              border border-[#245747]/15 bg-white md:block"
+          >
+            <div
+              role="region"
+              aria-label="Resident stays table"
+              tabIndex={0}
+              className="overflow-x-auto focus-visible:outline-2
+                focus-visible:outline-[#245747]"
+            >
+              <table className="w-full min-w-[720px] table-fixed text-left text-sm">
+                <caption className="sr-only">
+                  Resident stays, allocated rooms and current status
+                </caption>
+
+                <thead
+                  className="border-b border-[#245747]/15
+                    bg-[#E8EDE4]/60 text-xs text-[#245747]"
+                >
+                  <tr>
+                    <th scope="col" className="w-[28%] px-4 py-3">
+                      Resident
+                    </th>
+                    <th scope="col" className="w-[12%] px-4 py-3">
+                      Room
+                    </th>
+                    <th scope="col" className="w-[22%] px-4 py-3">
+                      Status
+                    </th>
+                    <th scope="col" className="w-[22%] px-4 py-3">
+                      Checked in
+                    </th>
+                    <th scope="col" className="w-[16%] px-4 py-3">
+                      Details
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-[#245747]/10">
+                  {stays.map((stay) => (
+                    <tr
+                      key={stay.id}
+                      className={
+                        selectedStay?.id === stay.id
+                          ? "bg-[#EDF3E8]"
+                          : "transition-colors hover:bg-[#FAF7F2]"
+                      }
+                    >
+                      <th
+                        scope="row"
+                        className="px-4 py-3 font-medium text-[#173F35]"
+                      >
+                        <p className="break-words">
+                          {getResidentName(stay)}
+                        </p>
+                        <p className="mt-1 text-xs font-normal text-[#78716C]">
+                          Stay #{stay.id}
+                        </p>
+                      </th>
+
+                      <td className="break-words px-4 py-3 text-[#57534E]">
+                        {stay.room_number}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <StatusBadge status={stay.status} />
+                      </td>
+
+                      <td className="px-4 py-3 text-xs leading-5 text-[#78716C]">
+                        {formatTimestamp(stay.check_in_at, "—")}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {renderDetailsButton(stay)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
-      <nav
-        aria-label="Resident stay pages"
-        className="flex items-center justify-between gap-3"
-      >
-        <button
-          type="button"
-          disabled={loading || busy || page === 1}
-          onClick={() => changePage(page - 1)}
-          className="button-secondary"
-        >
-          Previous
-        </button>
-
-        <span className="text-sm text-slate-500">Page {page}</span>
-
-        <button
-          type="button"
-          disabled={loading || busy || Boolean(listError) || !hasNext}
-          onClick={() => changePage(page + 1)}
-          className="button-secondary"
-        >
-          Next
-        </button>
-      </nav>
-
+      {/* Selected stay */}
       {selectedStay && !loading && !listError && (
         <section
+          id="stay-details"
           ref={detailsRef}
           tabIndex={-1}
           aria-labelledby="stay-details-title"
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !mutationRef.current) {
+              event.stopPropagation();
+              closeDetails();
+            }
+          }}
+          className="min-w-0 scroll-mt-24 rounded-2xl
+            border border-[#245747]/25 bg-white p-4
+            focus-visible:outline-2 focus-visible:outline-offset-4
+            focus-visible:outline-[#245747] sm:p-5"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-slate-500">
-                Stay #{selectedStay.id}
+              <p
+                className="text-xs font-semibold uppercase
+                  tracking-wide text-[#965038]"
+              >
+                Stay #{selectedStay.id} · Room {selectedStay.room_number}
               </p>
 
               <h2
                 id="stay-details-title"
-                className="mt-2 break-words font-heading text-base font-semibold text-slate-900"
+                className="mt-2 break-words font-heading
+                  text-lg font-semibold text-[#173F35]"
               >
                 {getResidentName(selectedStay)}
               </h2>
@@ -571,34 +706,30 @@ export default function StaysPage() {
               type="button"
               onClick={closeDetails}
               disabled={busy}
-              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              className={`${secondaryButton} shrink-0`}
             >
               Close
             </button>
           </div>
 
-          <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <dl
+            className="mt-5 grid gap-4 rounded-xl
+              bg-[#FAF7F2] p-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {[
               ["Room", selectedStay.room_number],
               ["Resident number", `#${selectedStay.resident}`],
               ["Application number", `#${selectedStay.application}`],
+              ["Checked in", formatTimestamp(selectedStay.check_in_at)],
+              ["Checked out", formatTimestamp(selectedStay.check_out_at)],
               [
-                "Checked in · Nairobi",
-                formatTimestamp(selectedStay.check_in_at),
-              ],
-              [
-                "Checked out · Nairobi",
-                formatTimestamp(selectedStay.check_out_at),
-              ],
-              [
-                "Created · Nairobi",
+                "Created",
                 formatTimestamp(selectedStay.created_at, "Unavailable"),
               ],
             ].map(([label, value]) => (
               <div key={label} className="min-w-0">
-                <dt className="text-xs text-slate-500">{label}</dt>
-
-                <dd className="mt-1 break-words text-sm font-medium text-slate-800">
+                <dt className="text-xs text-[#78716C]">{label}</dt>
+                <dd className="mt-1 break-words text-sm font-medium text-[#173F35]">
                   {value}
                 </dd>
               </div>
@@ -606,14 +737,17 @@ export default function StaysPage() {
           </dl>
 
           {selectedStay.status === "awaiting_payment" && (
-            <div className="mt-5 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            <div
+              className="mt-4 rounded-xl border border-amber-200
+                bg-amber-50 p-4 text-sm leading-6 text-amber-900"
+            >
               <p>
                 The first month’s full rent is required before the
                 reservation can be confirmed.
               </p>
 
-              <p className="mt-2 font-medium">
-                Payment deadline · Nairobi:{" "}
+              <p className="mt-2 font-semibold">
+                Payment deadline:{" "}
                 {formatTimestamp(
                   selectedStay.payment_deadline,
                   "Not available — staff review required",
@@ -623,52 +757,65 @@ export default function StaysPage() {
           )}
 
           {confirmation?.stayId === selectedStay.id ? (
-            <div className="mt-5 rounded-xl bg-slate-50 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">
+            <div
+              role="group"
+              aria-labelledby="stay-confirmation-heading"
+              aria-busy={busy}
+              className="mt-5 rounded-xl border
+                border-[#245747]/15 bg-[#FAF7F2] p-4"
+            >
+              <h3
+                id="stay-confirmation-heading"
+                className="text-sm font-semibold text-[#173F35]"
+              >
                 {actionDetails[confirmation.action].label} for{" "}
                 {getResidentName(selectedStay)}?
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[#57534E]">
                 {actionDetails[confirmation.action].message}
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={busy || needsRefresh}
-                  className="button-primary"
-                >
-                  {busy ? "Saving…" : "Confirm"}
-                </button>
-
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setConfirmation(null)}
                   disabled={busy}
-                  className="button-secondary"
+                  className={secondaryButton}
                 >
                   Go back
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={controlsDisabled}
+                  className={
+                    confirmation.action === "cancel"
+                      ? `${buttonBase} bg-red-700 text-white hover:bg-red-800`
+                      : primaryButton
+                  }
+                >
+                  {busy
+                    ? "Saving…"
+                    : `Confirm ${actionDetails[
+                        confirmation.action
+                      ].label.toLowerCase()}`}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="mt-5 border-t border-slate-100 pt-5">
+            <div className="mt-5 border-t border-[#245747]/10 pt-4">
               {availableActions.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {availableActions.map((action) => (
                     <button
                       key={action}
                       type="button"
-                      onClick={() =>
-                        openConfirmation(selectedStay, action)
-                      }
-                      disabled={busy || needsRefresh}
+                      onClick={() => openConfirmation(selectedStay, action)}
+                      disabled={controlsDisabled}
                       className={
-                        action === "cancel"
-                          ? "rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                          : "button-primary"
+                        action === "cancel" ? dangerButton : primaryButton
                       }
                     >
                       {actionDetails[action].label}
@@ -676,7 +823,7 @@ export default function StaysPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-[#78716C]">
                   No stay actions are available for this status.
                 </p>
               )}
@@ -684,6 +831,35 @@ export default function StaysPage() {
           )}
         </section>
       )}
+
+      <nav
+        aria-label="Resident stay pages"
+        className="flex items-center justify-between gap-3"
+      >
+        <button
+          type="button"
+          disabled={controlsDisabled || page === 1}
+          onClick={() => changePage(page - 1)}
+          className={secondaryButton}
+        >
+          Previous
+        </button>
+
+        <span className="text-sm text-[#57534E]">Page {page}</span>
+
+        <button
+          type="button"
+          disabled={controlsDisabled || Boolean(listError) || !hasNext}
+          onClick={() => changePage(page + 1)}
+          className={secondaryButton}
+        >
+          Next
+        </button>
+      </nav>
+
+      <p className="text-xs leading-5 text-[#78716C]">
+        All times are shown in Nairobi time.
+      </p>
     </section>
   );
 }
