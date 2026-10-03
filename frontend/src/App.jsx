@@ -14,6 +14,7 @@ import AnnouncementsPage from "./pages/AnnouncementsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import AboutPage from "./pages/AboutPage";
+import ContactPage from "./pages/ContactPage";
 
 // Authentication
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -50,6 +51,7 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="rooms" element={<RoomsPage />} />
+        <Route path="contact" element={<ContactPage />} />
         <Route path="rooms/:id" element={<RoomDetailsPage />} />
 
         <Route path="register" element={<RegisterPage />} />

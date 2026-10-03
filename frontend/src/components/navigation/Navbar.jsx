@@ -9,6 +9,11 @@ const publicLinks = [
   { label: "Home", to: "/" },
   { label: "Rooms", to: "/rooms" },
   { label: "About", to: "/about" },
+   {
+  label: "Contact",
+  to: "/contact",
+  roles: ["guest", "resident", "staff", "admin"],
+  }, 
 ];
 
 const accountLinks = [
@@ -72,6 +77,7 @@ const accountLinks = [
     to: "/announcements",
     roles: ["resident", "staff", "admin"],
   },
+ 
 ];
 
 const adminLinks = [

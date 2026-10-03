@@ -29,9 +29,7 @@ const linkClass =
 export default function Footer() {
   const { user, authLoading } = useAuth();
 
-  const isManagement = Boolean(
-    user && (user.is_staff || user.is_superuser),
-  );
+  const isManagement = Boolean(user && (user.is_staff || user.is_superuser));
 
   const accountLinks = !user
     ? guestLinks
@@ -101,8 +99,8 @@ export default function Footer() {
             </Link>
 
             <p className="mt-4 max-w-xs text-sm leading-6 text-[#D4E2D8]">
-              Find your room, follow your application and manage
-              everyday hostel life in one place.
+              Find your room, follow your application and manage everyday hostel
+              life in one place.
             </p>
 
             <p className="mt-5 text-xs font-medium tracking-wide text-[#E9BC9F]">
@@ -133,6 +131,11 @@ export default function Footer() {
                 <li>
                   <Link to="/rooms" className={linkClass}>
                     Browse rooms
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className={linkClass}>
+                    Contact
                   </Link>
                 </li>
 
@@ -173,10 +176,7 @@ export default function Footer() {
 
                   {user?.is_superuser && (
                     <li>
-                      <Link
-                        to="/admin/announcements"
-                        className={linkClass}
-                      >
+                      <Link to="/admin/announcements" className={linkClass}>
                         Manage announcements
                       </Link>
                     </li>
@@ -200,9 +200,8 @@ export default function Footer() {
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-[#D4E2D8]">
-              After application approval, pay the first month’s full
-              rent before your payment deadline to confirm your
-              reservation.
+              After application approval, pay the first month’s full rent before
+              your payment deadline to confirm your reservation.
             </p>
 
             <Link
@@ -226,9 +225,7 @@ export default function Footer() {
             pt-5 text-xs leading-6 text-[#C4D5CA]
             sm:mt-10 sm:flex-row sm:items-center sm:justify-between"
         >
-          <p>
-            © {new Date().getFullYear()} KejaSpace. All rights reserved.
-          </p>
+          <p>© {new Date().getFullYear()} KejaSpace. All rights reserved.</p>
 
           <p>A little less admin. A little more living.</p>
         </div>
