@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import useAuth from "../../hooks/useAuth";
 import LoadingMessage from "../../components/common/LoadingMessage";
@@ -22,6 +31,16 @@ const secondaryButton =
   "hover:bg-[#E8EDE4] focus-visible:outline-2 " +
   "focus-visible:outline-offset-2 focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-50";
+
+const panelStyle =
+  "min-w-0 rounded-2xl border border-[#245747]/15 bg-white p-4 sm:p-5";
+
+const statStyles = {
+  forest: "bg-[#E8EDE4] text-[#245747]",
+  clay: "bg-[#F5E8DE] text-[#965038]",
+  olive: "bg-[#EEF0DC] text-[#626B35]",
+  amber: "bg-amber-50 text-amber-800",
+};
 
 function hasValidDashboard(data) {
   const counts = [
@@ -49,37 +68,23 @@ function hasValidDashboard(data) {
   );
 }
 
-const statStyles = {
-  forest: "bg-[#E8EDE4] text-[#245747]",
-  clay: "bg-[#F5E8DE] text-[#965038]",
-  olive: "bg-[#EEF0DC] text-[#626B35]",
-  amber: "bg-amber-50 text-amber-800",
-};
-
 function StatCard({ label, value, description, icon, tone }) {
   return (
-    <article
-      className="flex min-w-0 flex-col rounded-2xl
-        border border-[#245747]/15 bg-white p-4 sm:p-5"
-    >
+    <article className={panelStyle}>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-medium text-[#57534E]">
-          {label}
-        </h2>
+        <h2 className="text-sm font-medium text-[#57534E]">{label}</h2>
 
         <span
           aria-hidden="true"
-          className={`flex size-9 shrink-0 items-center
-            justify-center rounded-xl ${statStyles[tone]}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
+            statStyles[tone]
+          }`}
         >
           <ManagementIcon name={icon} className="size-4" />
         </span>
       </div>
 
-      <p
-        className="mt-3 break-words font-heading text-2xl
-          font-bold tracking-tight text-[#173F35] tabular-nums"
-      >
+      <p className="mt-3 break-words font-heading text-2xl font-bold tracking-tight tabular-nums text-[#173F35]">
         {numberFormatter.format(value)}
       </p>
 
@@ -90,7 +95,7 @@ function StatCard({ label, value, description, icon, tone }) {
   );
 }
 
-// These are stay counts, not percentages of room capacity.
+// Existing round chart: counts of stays across all rooms.
 function StayOverview({ stays }) {
   const segments = [
     {
@@ -120,21 +125,14 @@ function StayOverview({ stays }) {
   const stops = segments.map((item) => {
     const start = cumulative;
     cumulative += total > 0 ? (item.value / total) * 100 : 0;
-
     return `${item.colour} ${start}% ${cumulative}%`;
   });
 
-  const chartBackground =
-    total > 0
-      ? `conic-gradient(${stops.join(", ")})`
-      : "#E8EDE4";
+  const background =
+    total > 0 ? `conic-gradient(${stops.join(", ")})` : "#E8EDE4";
 
   return (
-    <section
-      aria-labelledby="stay-overview-heading"
-      className="min-w-0 rounded-2xl border
-        border-[#245747]/15 bg-white p-4 sm:p-5"
-    >
+    <section aria-labelledby="stay-overview-heading" className={panelStyle}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2
@@ -145,41 +143,24 @@ function StayOverview({ stays }) {
           </h2>
 
           <p className="mt-1 text-xs leading-5 text-[#78716C]">
-            Checked-in stays, reservations and current payment holds.
+            Current stays across all rooms.
           </p>
         </div>
 
-        <Link
-          to="/staff/stays"
-          className="inline-flex min-h-11 items-center
-            gap-2 rounded-lg text-sm font-semibold text-[#245747]
-            underline-offset-4 hover:underline
-            focus-visible:outline-2 focus-visible:outline-offset-2
-            focus-visible:outline-[#245747]"
-        >
-          View stays <span aria-hidden="true">→</span>
+        <Link to="/staff/stays" className={secondaryButton}>
+          View stays
+          <span aria-hidden="true">→</span>
         </Link>
       </div>
 
-      <div
-        className="mt-5 grid items-center gap-6
-          sm:grid-cols-[190px_minmax(0,1fr)]"
-      >
-        {/* The same chart values are available as text in the legend. */}
+      <div className="mt-6 grid items-center gap-6 sm:grid-cols-[180px_minmax(0,1fr)]">
         <div
           aria-hidden="true"
-          className="relative mx-auto flex size-44
-            items-center justify-center rounded-full"
-          style={{ background: chartBackground }}
+          className="mx-auto flex size-44 items-center justify-center rounded-full"
+          style={{ background }}
         >
-          <div
-            className="flex size-32 flex-col items-center
-              justify-center rounded-full bg-white px-3 text-center"
-          >
-            <span
-              className="font-heading text-2xl font-bold
-                text-[#173F35] tabular-nums"
-            >
+          <div className="flex size-32 flex-col items-center justify-center rounded-full bg-white px-3 text-center">
+            <span className="font-heading text-2xl font-bold tabular-nums text-[#173F35]">
               {numberFormatter.format(total)}
             </span>
 
@@ -189,7 +170,7 @@ function StayOverview({ stays }) {
           </div>
         </div>
 
-        <div className="min-w-0">
+        <div>
           <p className="sr-only">
             Total stays shown: {numberFormatter.format(total)}.
           </p>
@@ -198,13 +179,10 @@ function StayOverview({ stays }) {
             {segments.map((item) => (
               <div
                 key={item.label}
-                className="flex items-start justify-between gap-4"
+                className="flex items-start justify-between gap-3"
               >
-                <dt className="min-w-0">
-                  <span
-                    className="flex items-center gap-2
-                      text-sm font-medium text-[#173F35]"
-                  >
+                <dt>
+                  <span className="flex items-center gap-2 text-sm font-medium text-[#173F35]">
                     <span
                       aria-hidden="true"
                       className="size-2.5 shrink-0 rounded-full"
@@ -213,18 +191,12 @@ function StayOverview({ stays }) {
                     {item.label}
                   </span>
 
-                  <span
-                    className="mt-1 block pl-[18px]
-                      text-xs leading-5 text-[#78716C]"
-                  >
+                  <span className="mt-1 block text-xs leading-5 text-[#78716C]">
                     {item.description}
                   </span>
                 </dt>
 
-                <dd
-                  className="shrink-0 text-sm font-semibold
-                    text-[#173F35] tabular-nums"
-                >
+                <dd className="text-sm font-semibold tabular-nums text-[#173F35]">
                   {numberFormatter.format(item.value)}
                 </dd>
               </div>
@@ -234,17 +206,150 @@ function StayOverview({ stays }) {
       </div>
 
       {total === 0 && (
-        <p className="mt-4 text-sm leading-6 text-[#57534E]">
+        <p className="mt-4 text-sm text-[#57534E]">
           No stays in these statuses yet.
         </p>
       )}
 
-      <p
-        className="mt-5 border-t border-[#245747]/10
-          pt-3 text-xs leading-5 text-[#78716C]"
-      >
-        This chart shows the mix of stay statuses, not room occupancy.
+      <p className="mt-5 border-t border-[#245747]/10 pt-3 text-xs leading-5 text-[#78716C]">
+        This shows the mix of stay statuses, not the percentage of room
+        capacity occupied.
       </p>
+    </section>
+  );
+}
+
+function ActivityTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+
+  const item = payload[0].payload;
+
+  return (
+    <div className="max-w-60 rounded-xl border border-[#245747]/20 bg-white p-3 shadow-lg">
+      <p className="text-sm font-semibold text-[#173F35]">
+        {item.label}
+      </p>
+
+      <p className="mt-1 text-sm text-[#57534E]">
+        {numberFormatter.format(item.value)} {item.unit}
+      </p>
+
+      <p className="mt-1 text-xs leading-5 text-[#78716C]">
+        {item.description}
+      </p>
+    </div>
+  );
+}
+
+function ActivityBarChart({ dashboard }) {
+  const data = [
+    {
+      label: "Applications",
+      value: dashboard.applications.pending,
+      unit: "pending applications",
+      description: "Awaiting a staff decision.",
+    },
+    {
+      label: "Maintenance",
+      value: dashboard.maintenance.unresolved,
+      unit: "open requests",
+      description: "Pending or currently in progress.",
+    },
+    {
+      label: "M-Pesa review",
+      value: dashboard.payments.mpesa_attempts_needing_review,
+      unit: "attempts requiring review",
+      description: "Payment outcomes that need investigation.",
+    },
+  ];
+
+  const maximum = Math.max(1, ...data.map((item) => item.value));
+  const allZero = data.every((item) => item.value === 0);
+
+  return (
+    <section aria-labelledby="activity-chart-heading" className={panelStyle}>
+      <h2
+        id="activity-chart-heading"
+        className="font-heading text-base font-semibold text-[#173F35]"
+      >
+        Work awaiting attention
+      </h2>
+
+      <p className="mt-1 text-xs leading-5 text-[#78716C]">
+        Current record counts by category.
+      </p>
+
+      {/* An explicit height gives ResponsiveContainer room to draw. */}
+      <div className="mt-5 h-64 w-full min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <BarChart
+            data={data}
+            layout="vertical"
+            accessibilityLayer
+            margin={{ top: 10, right: 24, bottom: 5, left: 0 }}
+            barCategoryGap="35%"
+          >
+            <CartesianGrid
+              horizontal={false}
+              stroke="#E8EDE4"
+              strokeDasharray="4 4"
+            />
+
+            <XAxis
+              type="number"
+              allowDecimals={false}
+              domain={[0, maximum]}
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: "#78716C", fontSize: 12 }}
+            />
+
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={100}
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: "#57534E", fontSize: 12 }}
+            />
+
+            <Tooltip
+              content={<ActivityTooltip />}
+              cursor={{ fill: "#FAF7F2" }}
+            />
+
+            <Bar
+              dataKey="value"
+              name="Records"
+              fill="#245747"
+              radius={[0, 6, 6, 0]}
+              maxBarSize={30}
+              isAnimationActive={false}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {allZero && (
+        <p className="mt-2 text-sm leading-6 text-[#57534E]">
+          No records currently need attention in these categories.
+        </p>
+      )}
+
+      {/* Exact values remain available without hovering. */}
+      <dl className="mt-3 divide-y divide-[#245747]/10 border-t border-[#245747]/10">
+        {data.map((item) => (
+          <div
+            key={item.label}
+            className="flex items-center justify-between gap-4 py-2 text-xs"
+          >
+            <dt className="text-[#57534E]">{item.label}</dt>
+            <dd className="font-semibold tabular-nums text-[#173F35]">
+              {numberFormatter.format(item.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -313,8 +418,6 @@ export default function DashboardPage() {
           count: dashboard.applications.pending,
           icon: "applications",
           to: "/staff/applications",
-          action: "Review applications",
-          badge: "Pending",
         },
         {
           label: "Maintenance requests",
@@ -322,8 +425,6 @@ export default function DashboardPage() {
           count: dashboard.maintenance.unresolved,
           icon: "maintenance",
           to: "/staff/maintenance",
-          action: "View maintenance requests",
-          badge: "Open",
         },
         {
           label: "Payment holds",
@@ -331,8 +432,6 @@ export default function DashboardPage() {
           count: dashboard.stays.unexpired_payment_holds,
           icon: "clock",
           to: "/staff/stays",
-          action: "View resident stays",
-          badge: "Unexpired",
         },
         {
           label: "M-Pesa attempts",
@@ -340,34 +439,24 @@ export default function DashboardPage() {
           count: dashboard.payments.mpesa_attempts_needing_review,
           icon: "payments",
           to: null,
-          action: null,
-          badge: "Review",
         },
       ]
     : [];
 
   return (
     <section aria-labelledby="dashboard-heading" className="min-w-0">
-      {/* Welcome */}
-      <header
-        className="flex flex-wrap items-center justify-between
-          gap-4 rounded-2xl border border-[#245747]/10
-          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
-          to-[#DCE9DD] p-5 sm:p-6"
-      >
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
         <div className="min-w-0">
           <p
             lang="sw"
-            className="text-xs font-semibold uppercase
-              tracking-[0.14em] text-[#965038]"
+            className="text-xs font-semibold uppercase tracking-[0.14em] text-[#965038]"
           >
             Karibu tena
           </p>
 
           <h1
             id="dashboard-heading"
-            className="mt-2 font-heading text-2xl
-              font-bold tracking-tight text-[#173F35]"
+            className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]"
           >
             Your hostel, at a glance.
           </h1>
@@ -391,25 +480,20 @@ export default function DashboardPage() {
       </header>
 
       {loading ? (
-        <div
-          className="mt-5 rounded-2xl border
-            border-[#245747]/15 bg-white p-5"
-        >
+        <div className={`mt-5 ${panelStyle}`}>
           <LoadingMessage label="Loading hostel overview…" compact />
         </div>
       ) : error ? (
         <div
           role="alert"
-          className="mt-5 rounded-2xl border border-red-100
-            bg-red-50 p-4 text-sm leading-6 text-red-800"
+          className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-800"
         >
           <p>{error}</p>
 
           <button
             type="button"
             onClick={refreshDashboard}
-            className="mt-3 inline-flex min-h-11 items-center
-              rounded-lg font-semibold underline underline-offset-4"
+            className="mt-3 min-h-11 font-semibold underline underline-offset-4"
           >
             Try again
           </button>
@@ -453,25 +537,21 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Chart and payments */}
-          <div
-            className="mt-5 grid items-stretch gap-5
-              xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
-          >
+          {/* Round chart and Recharts bar chart */}
+          <div className="mt-5 grid items-stretch gap-5 xl:grid-cols-2">
             <StayOverview stays={dashboard.stays} />
+            <ActivityBarChart dashboard={dashboard} />
+          </div>
 
+          {/* Payments and follow-up list */}
+          <div className="mt-5 grid items-stretch gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
             <aside
               aria-labelledby="recorded-payments-heading"
-              className="flex min-w-0 flex-col rounded-2xl
-                border border-[#173F35] bg-gradient-to-br
-                from-[#245747] to-[#173F35] p-5 text-white sm:p-6"
+              className="flex min-w-0 flex-col rounded-2xl border border-[#173F35] bg-gradient-to-br from-[#245747] to-[#173F35] p-5 text-white sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p
-                    className="text-xs font-semibold uppercase
-                      tracking-[0.12em] text-[#E9BC9F]"
-                  >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#E9BC9F]">
                     Payment records
                   </p>
 
@@ -485,18 +565,13 @@ export default function DashboardPage() {
 
                 <span
                   aria-hidden="true"
-                  className="flex size-10 shrink-0 items-center
-                    justify-center rounded-xl border
-                    border-white/15 bg-white/10"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10"
                 >
                   <ManagementIcon name="payments" className="size-5" />
                 </span>
               </div>
 
-              <p
-                className="mt-6 break-words font-heading
-                  text-2xl font-bold tracking-tight tabular-nums"
-              >
+              <p className="mt-6 break-words font-heading text-2xl font-bold tracking-tight tabular-nums">
                 {moneyFormatter.format(
                   Number(dashboard.payments.recorded_total_all_time),
                 )}
@@ -514,14 +589,7 @@ export default function DashboardPage() {
               <div className="mt-auto pt-5">
                 <Link
                   to="/staff/rent-payments"
-                  className="flex min-h-11 items-center
-                    justify-between gap-3 rounded-xl
-                    bg-[#E8EDE4] px-4 py-3 text-sm
-                    font-semibold text-[#173F35]
-                    transition-colors hover:bg-white
-                    focus-visible:outline-2
-                    focus-visible:outline-offset-4
-                    focus-visible:outline-[#E9BC9F]"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-[#E8EDE4] px-4 py-3 text-sm font-semibold text-[#173F35] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E9BC9F]"
                 >
                   Open rent & payments
                   <span aria-hidden="true">→</span>
@@ -529,131 +597,82 @@ export default function DashboardPage() {
 
                 <Link
                   to="/staff/reports/payments"
-                  className="mt-2 inline-flex min-h-11 items-center
-                    rounded-lg text-xs font-semibold text-[#E2EBE4]
-                    underline-offset-4 hover:underline
-                    focus-visible:outline-2
-                    focus-visible:outline-offset-2
-                    focus-visible:outline-[#E9BC9F]"
+                  className="mt-2 inline-flex min-h-11 items-center rounded-lg text-xs font-semibold text-[#E2EBE4] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E9BC9F]"
                 >
                   View payment report
                 </Link>
               </div>
             </aside>
-          </div>
 
-          {/* Work queue */}
-          <section
-            aria-labelledby="attention-heading"
-            className="mt-5 min-w-0 overflow-hidden
-              rounded-2xl border border-[#245747]/15 bg-white"
-          >
-            <div
-              className="flex flex-wrap items-center justify-between
-                gap-3 border-b border-[#245747]/10 p-4 sm:px-5"
+            <section
+              aria-labelledby="attention-heading"
+              className="min-w-0 overflow-hidden rounded-2xl border border-[#245747]/15 bg-white"
             >
-              <div>
+              <div className="border-b border-[#245747]/10 p-4 sm:px-5">
                 <h2
                   id="attention-heading"
-                  className="font-heading text-base
-                    font-semibold text-[#173F35]"
+                  className="font-heading text-base font-semibold text-[#173F35]"
                 >
-                  Keep an eye on
+                  Follow up
                 </h2>
 
                 <p className="mt-1 text-xs leading-5 text-[#78716C]">
-                  Requests and records that may need follow-up.
+                  Open the relevant page to handle these records.
                 </p>
               </div>
 
-              <span
-                className="rounded-full bg-[#FAF7F2]
-                  px-3 py-1.5 text-xs text-[#57534E]"
-              >
-                Current activity
-              </span>
-            </div>
-
-            <ul className="divide-y divide-[#245747]/10">
-              {tasks.map((task) => (
-                <li
-                  key={task.label}
-                  className="flex flex-wrap items-center
-                    gap-3 p-4 transition-colors
-                    hover:bg-[#FAF7F2]/70 sm:px-5"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-9 shrink-0 items-center
-                      justify-center rounded-xl
-                      bg-[#E8EDE4] text-[#245747]"
+              <ul className="divide-y divide-[#245747]/10">
+                {tasks.map((task) => (
+                  <li
+                    key={task.label}
+                    className="flex flex-wrap items-center gap-3 p-4 hover:bg-[#FAF7F2]/70 sm:px-5"
                   >
-                    <ManagementIcon name={task.icon} className="size-4" />
-                  </span>
-
-                  <div className="min-w-0 flex-1 basis-40">
-                    <h3 className="text-sm font-semibold text-[#173F35]">
-                      {task.label}
-                    </h3>
-
-                    <p className="mt-1 text-xs leading-5 text-[#78716C]">
-                      {task.description}
-                    </p>
-                  </div>
-
-                  <div className="ml-auto flex items-center gap-3">
                     <span
-                      className={`rounded-full px-2.5 py-1
-                        text-xs font-medium ${
-                          task.count > 0
-                            ? "bg-[#F5E8DE] text-[#965038]"
-                            : "bg-[#E8EDE4] text-[#245747]"
-                        }`}
+                      aria-hidden="true"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#E8EDE4] text-[#245747]"
                     >
-                      {task.badge}
+                      <ManagementIcon name={task.icon} className="size-4" />
                     </span>
 
-                    <span
-                      className="min-w-7 text-center text-sm
-                        font-semibold text-[#173F35] tabular-nums"
-                    >
+                    <div className="min-w-0 flex-1 basis-32">
+                      <h3 className="text-sm font-semibold text-[#173F35]">
+                        {task.label}
+                      </h3>
+
+                      <p className="mt-1 text-xs leading-5 text-[#78716C]">
+                        {task.description}
+                      </p>
+                    </div>
+
+                    <span className="text-sm font-semibold tabular-nums text-[#173F35]">
                       {numberFormatter.format(task.count)}
                     </span>
 
                     {task.to ? (
                       <Link
                         to={task.to}
-                        aria-label={task.action}
-                        className="inline-flex size-11 items-center
-                          justify-center rounded-xl text-[#245747]
-                          transition-colors hover:bg-[#E8EDE4]
-                          focus-visible:outline-2
-                          focus-visible:outline-offset-2
-                          focus-visible:outline-[#245747]"
+                        aria-label={`View ${task.label.toLowerCase()}`}
+                        className="inline-flex size-11 items-center justify-center rounded-xl text-[#245747] hover:bg-[#E8EDE4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#245747]"
                       >
                         <span aria-hidden="true">→</span>
                       </Link>
                     ) : (
                       <span className="size-11" aria-hidden="true" />
                     )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
 
-            {dashboard.payments.mpesa_attempts_needing_review > 0 && (
-              <p
-                className="mx-4 mb-4 rounded-xl bg-amber-50
-                  p-3 text-xs leading-6 text-amber-900 sm:mx-5"
-              >
-                M-Pesa attempts marked for review are not proof of
-                successful payment. Confirm their outcome before
-                recording another payment for the same transaction.
-              </p>
-            )}
-          </section>
+              {dashboard.payments.mpesa_attempts_needing_review > 0 && (
+                <p className="mx-4 mb-4 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900 sm:mx-5">
+                  M-Pesa attempts marked for review are not proof of
+                  successful payment. Confirm their outcome before
+                  recording another payment for the same transaction.
+                </p>
+              )}
+            </section>
+          </div>
 
-          {/* Snapshot time */}
           <p className="mt-4 text-xs leading-5 text-[#78716C]">
             Last loaded{" "}
             {loadedAt?.toLocaleTimeString("en-KE", {
@@ -664,28 +683,26 @@ export default function DashboardPage() {
             EAT. Use Refresh to load the latest figures.
           </p>
 
-          <details
-            className="mt-3 rounded-xl border
-              border-[#245747]/10 bg-white/60 px-4 py-2"
-          >
-            <summary
-              className="w-fit cursor-pointer rounded-lg
-                py-2 text-xs font-semibold text-[#245747]
-                focus-visible:outline-2 focus-visible:outline-offset-2
-                focus-visible:outline-[#245747]"
-            >
+          <details className="mt-3 rounded-xl border border-[#245747]/10 bg-white/60 px-4 py-2">
+            <summary className="cursor-pointer rounded-lg py-2 text-xs font-semibold text-[#245747] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#245747]">
               What these figures mean
             </summary>
 
             <div className="max-w-3xl space-y-2 pb-3 text-xs leading-6 text-[#57534E]">
               <p>
                 Available spaces cover active rooms. Checked-in stays,
-                reservations and unexpired payment holds use those spaces.
+                reservations and unexpired payment holds reduce availability.
               </p>
 
               <p>
-                Checked-in stays and the stay-status chart cover all rooms.
+                The round chart covers stay statuses across all rooms.
                 Use the occupancy report for room-by-room allocations.
+              </p>
+
+              <p>
+                The bar chart compares current pending applications,
+                unresolved maintenance requests and M-Pesa attempts
+                requiring review. It does not show monthly trends.
               </p>
 
               <p>
