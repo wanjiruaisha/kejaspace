@@ -64,10 +64,11 @@ const inputClass =
   "focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
-const labelClass = "block text-sm font-semibold text-[#173F35]";
+const labelClass =
+  "block text-sm font-semibold text-[#173F35]";
 
 const panelClass =
-  "min-w-0 scroll-mt-24 rounded-2xl border border-[#245747]/20 " +
+  "min-w-0 scroll-mt-24 rounded-2xl border border-[#245747]/15 " +
   "bg-white p-4 sm:p-5 focus-visible:outline-2 " +
   "focus-visible:outline-offset-4 focus-visible:outline-[#245747]";
 
@@ -90,7 +91,7 @@ function money(value) {
   return currencyFormatter.format(Number(value));
 }
 
-// Use whole cents when comparing amounts.
+// Compare money using whole cents.
 function toCents(value) {
   const text = String(value ?? "").trim();
 
@@ -101,6 +102,29 @@ function toCents(value) {
     Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
 
   return Number.isSafeInteger(cents) ? cents : null;
+}
+
+function formatDate(value, monthOnly = false) {
+  if (!value) return "Unavailable";
+
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  return new Intl.DateTimeFormat("en-KE", {
+    month: "long",
+    year: "numeric",
+    ...(monthOnly ? {} : { day: "numeric" }),
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function residentLabel(charge) {
+  return (
+    charge.resident_name ||
+    charge.resident_username ||
+    "Resident unavailable"
+  );
 }
 
 function getErrorMessage(error) {
@@ -136,10 +160,21 @@ function PaymentBadge({ status }) {
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded-full
-        px-2.5 py-1.5 text-xs font-medium ${details.classes}`}
+        px-2.5 py-1 text-xs font-medium ${details.classes}`}
     >
       {details.label}
     </span>
+  );
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[#78716C]">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-[#173F35]">
+        {value ?? "Unavailable"}
+      </dd>
+    </div>
   );
 }
 
@@ -222,7 +257,7 @@ export default function RentPaymentsPage() {
         block: "nearest",
       });
     }
-  }, [showCreate, selectedCharge]);
+  }, [showCreate, selectedCharge, showPayment]);
 
   function resetPanels() {
     setSelectedCharge(null);
@@ -242,7 +277,6 @@ export default function RentPaymentsPage() {
     }
   }
 
-  // Also called internally after a successful save.
   function refreshCharges() {
     resetPanels();
     setLoading(true);
@@ -308,13 +342,14 @@ export default function RentPaymentsPage() {
     setShowCreate(true);
   }
 
-  function viewDetails(charge, button) {
+  function openCharge(charge, button, payment = false) {
     if (mutationLock.current || loading) return;
+    if (payment && needsReview) return;
 
     triggerRef.current = button;
     setSelectedCharge(charge);
     setShowCreate(false);
-    setShowPayment(false);
+    setShowPayment(payment);
     setMessage("");
 
     if (!needsReview) setActionError("");
@@ -478,7 +513,7 @@ export default function RentPaymentsPage() {
 
       if (
         recorded?.id == null ||
-        recorded.charge !== selectedCharge.id
+        String(recorded.charge) !== String(selectedCharge.id)
       ) {
         throw new Error("Unexpected payment response.");
       }
@@ -502,11 +537,212 @@ export default function RentPaymentsPage() {
 
   const locked = busy || needsReview || loading;
 
-  const balanceCents = selectedCharge
-    ? toCents(selectedCharge.payment_summary?.balance)
-    : null;
+  function renderChargeDetails(charge) {
+    const balanceCents = toCents(charge.payment_summary?.balance);
+    const hasBalance = balanceCents !== null && balanceCents > 0;
 
-  const hasBalance = balanceCents !== null && balanceCents > 0;
+    return (
+      <section
+        id={`charge-details-${charge.id}`}
+        ref={panelRef}
+        tabIndex={-1}
+        aria-labelledby={`charge-heading-${charge.id}`}
+        onKeyDown={handlePanelKeyDown}
+        className="scroll-mt-24 border-t border-[#245747]/15
+          bg-[#FAF7F2]/70 p-4 sm:p-5
+          focus-visible:outline-2 focus-visible:outline-[#245747]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h3
+            id={`charge-heading-${charge.id}`}
+            className="font-heading text-base font-semibold text-[#173F35]"
+          >
+            Charge details
+          </h3>
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={closePanel}
+            className={secondaryButton}
+          >
+            Close
+          </button>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <DetailItem
+            label="Resident"
+            value={residentLabel(charge)}
+          />
+          <DetailItem label="Room" value={charge.room_number} />
+          <DetailItem
+            label="Billing month"
+            value={formatDate(charge.billing_month, true)}
+          />
+          <DetailItem
+            label="Due date"
+            value={formatDate(charge.due_date)}
+          />
+          <DetailItem
+            label="Charge amount"
+            value={money(charge.amount)}
+          />
+          <DetailItem
+            label="Amount paid"
+            value={money(charge.payment_summary?.amount_paid)}
+          />
+          <DetailItem
+            label="Balance"
+            value={money(charge.payment_summary?.balance)}
+          />
+          <DetailItem
+            label="Charge type"
+            value={charge.is_initial_rent ? "Initial rent" : "Monthly rent"}
+          />
+        </dl>
+
+        <p className="mt-4 text-xs text-[#78716C]">
+          Internal records: charge {charge.id} · stay {charge.stay}
+        </p>
+
+        <Link
+          to="/staff/reports/payments"
+          className="mt-3 inline-flex min-h-11 items-center text-sm
+            font-semibold text-[#245747] underline underline-offset-4"
+        >
+          Open payment report
+        </Link>
+
+        {balanceCents === null && (
+          <p className="mt-3 text-sm leading-6 text-amber-800">
+            The balance is unavailable. Refresh the charge before
+            recording a payment.
+          </p>
+        )}
+
+        {balanceCents === 0 && (
+          <p className="mt-3 text-sm font-medium text-[#245747]">
+            This charge has no remaining balance.
+          </p>
+        )}
+
+        {hasBalance && !showPayment && (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => setShowPayment(true)}
+              className={primaryButton}
+            >
+              Record payment
+            </button>
+          </div>
+        )}
+
+        {hasBalance && showPayment && (
+          <form
+            onSubmit={handlePayment}
+            aria-busy={busy}
+            className="mt-4 border-t border-[#245747]/15 pt-4"
+          >
+            <h4 className="font-heading text-base font-semibold text-[#173F35]">
+              Record received payment
+            </h4>
+
+            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+              Record only confirmed cash or bank payments.
+              {charge.is_initial_rent &&
+                " Initial rent requires full payment before the hold expires."}
+            </p>
+
+            <fieldset
+              disabled={locked}
+              className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              <legend className="sr-only">Payment details</legend>
+
+              <div className="min-w-0">
+                <label htmlFor="payment-amount" className={labelClass}>
+                  Amount received (KES)
+                </label>
+                <input
+                  id="payment-amount"
+                  type="number"
+                  min="0.01"
+                  max={charge.payment_summary?.balance}
+                  step="0.01"
+                  required
+                  value={paymentForm.amount}
+                  onChange={(event) =>
+                    setPaymentForm((previous) => ({
+                      ...previous,
+                      amount: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="min-w-0">
+                <label htmlFor="payment-method" className={labelClass}>
+                  Payment method
+                </label>
+                <select
+                  id="payment-method"
+                  value={paymentForm.method}
+                  onChange={(event) =>
+                    setPaymentForm((previous) => ({
+                      ...previous,
+                      method: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="bank">Bank transfer</option>
+                </select>
+              </div>
+
+              <div className="min-w-0">
+                <label htmlFor="payment-reference" className={labelClass}>
+                  Receipt / transaction reference
+                </label>
+                <input
+                  id="payment-reference"
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={paymentForm.reference}
+                  onChange={(event) =>
+                    setPaymentForm((previous) => ({
+                      ...previous,
+                      reference: event.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
+                <button type="submit" className={primaryButton}>
+                  {busy ? "Recording…" : "Save payment"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPayment(false)}
+                  className={secondaryButton}
+                >
+                  Cancel
+                </button>
+              </div>
+            </fieldset>
+          </form>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -514,30 +750,24 @@ export default function RentPaymentsPage() {
       className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
     >
       <header
-        className="flex flex-wrap items-center justify-between
-          gap-4 rounded-2xl border border-[#245747]/10
-          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8]
-          to-[#DCE9DD] p-5 sm:p-6"
+        className="flex flex-wrap items-center justify-between gap-4
+          rounded-2xl border border-[#245747]/10
+          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD]
+          p-5 sm:p-6"
       >
         <div className="min-w-0">
-          <p
-            className="text-xs font-semibold uppercase
-              tracking-[0.14em] text-[#965038]"
-          >
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#965038]">
             Charges & records
           </p>
-
           <h1
             id="rent-heading"
-            className="mt-2 font-heading text-2xl
-              font-bold tracking-tight text-[#173F35]"
+            className="mt-2 font-heading text-2xl font-bold
+              tracking-tight text-[#173F35]"
           >
             Rent & payments
           </h1>
-
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
-            Check rent balances, create monthly charges and record
-            cash or bank payments received.
+            Check balances, create monthly charges and record received payments.
           </p>
         </div>
 
@@ -548,10 +778,8 @@ export default function RentPaymentsPage() {
             onClick={handleRefresh}
             className={secondaryButton}
           >
-            <span aria-hidden="true">↻</span>
             Refresh
           </button>
-
           <button
             type="button"
             disabled={locked}
@@ -567,8 +795,8 @@ export default function RentPaymentsPage() {
       {message && (
         <p
           role="status"
-          className="rounded-xl border border-emerald-100
-            bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
+          className="rounded-xl border border-emerald-100 bg-emerald-50
+            p-4 text-sm leading-6 text-emerald-800"
         >
           {message}
         </p>
@@ -577,8 +805,8 @@ export default function RentPaymentsPage() {
       {actionError && (
         <div
           role="alert"
-          className="rounded-xl border border-amber-200
-            bg-amber-50 p-4 text-sm leading-6 text-amber-900"
+          className="rounded-xl border border-amber-200 bg-amber-50
+            p-4 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -589,16 +817,14 @@ export default function RentPaymentsPage() {
                 payments and refresh the charges. Reopen the page only
                 after checking whether the earlier action succeeded.
               </p>
-
               <div className="flex flex-wrap items-center gap-3">
                 <Link
                   to="/staff/reports/payments"
-                  className="inline-flex min-h-11 items-center
-                    rounded-lg font-semibold underline underline-offset-4"
+                  className="inline-flex min-h-11 items-center rounded-lg
+                    font-semibold underline underline-offset-4"
                 >
                   Open payment report
                 </Link>
-
                 <button
                   type="button"
                   disabled={busy || loading}
@@ -613,202 +839,6 @@ export default function RentPaymentsPage() {
         </div>
       )}
 
-      {/* Search, filters and ordering */}
-      <form onSubmit={applyFilters} className={panelClass}>
-        <fieldset disabled={busy || loading} className="min-w-0">
-          <legend className="font-heading text-base font-semibold text-[#173F35]">
-            Find rent charges
-          </legend>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                name: "search",
-                label: "Search room",
-                type: "search",
-                placeholder: "For example: A101",
-              },
-              {
-                name: "billing_month",
-                label: "Billing month",
-                type: "month",
-              },
-              {
-                name: "due_date",
-                label: "Due date",
-                type: "date",
-              },
-            ].map((field) => (
-              <div key={field.name} className="min-w-0">
-                <label
-                  htmlFor={`filter-${field.name}`}
-                  className={labelClass}
-                >
-                  {field.label}
-                </label>
-
-                <input
-                  id={`filter-${field.name}`}
-                  name={field.name}
-                  type={field.type}
-                  placeholder={field.placeholder}
-                  value={filterForm[field.name]}
-                  onChange={updateFilterForm}
-                  className={inputClass}
-                />
-              </div>
-            ))}
-
-            <div className="min-w-0">
-              <label htmlFor="charge-ordering" className={labelClass}>
-                Sort by
-              </label>
-
-              <select
-                id="charge-ordering"
-                name="ordering"
-                value={filterForm.ordering}
-                onChange={updateFilterForm}
-                className={inputClass}
-              >
-                <option value="-billing_month,-id">
-                  Latest billing month
-                </option>
-                <option value="billing_month,id">
-                  Earliest billing month
-                </option>
-                <option value="amount,id">Amount: low to high</option>
-                <option value="-amount,-id">Amount: high to low</option>
-                <option value="due_date,id">Earliest due date</option>
-                <option value="-due_date,-id">Latest due date</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="submit" className={primaryButton}>
-              Apply filters
-            </button>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              className={secondaryButton}
-            >
-              Clear filters
-            </button>
-          </div>
-        </fieldset>
-      </form>
-
-      {/* Charge list */}
-      {loading ? (
-        <p role="status" className={`${panelClass} text-sm text-[#57534E]`}>
-          Loading charges…
-        </p>
-      ) : error ? (
-        <div
-          role="alert"
-          className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-800"
-        >
-          <p>{error}</p>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={busy}
-            className="mt-2 inline-flex min-h-11 items-center
-              rounded-lg font-semibold underline underline-offset-4"
-          >
-            Try again
-          </button>
-        </div>
-      ) : charges.length === 0 ? (
-        <div
-          className="rounded-2xl border border-dashed
-            border-[#245747]/25 bg-white px-5 py-9 text-center"
-        >
-          <h2 className="font-heading text-base font-semibold text-[#173F35]">
-            No charges found
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-[#57534E]">
-            No charges match this view. Try clearing the filters.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {charges.map((charge) => {
-            const selected = selectedCharge?.id === charge.id;
-
-            return (
-              <article
-                key={charge.id}
-                className={`min-w-0 rounded-2xl border p-4 sm:p-5 ${
-                  selected
-                    ? "border-[#245747]/40 bg-[#EDF3E8]"
-                    : "border-[#245747]/15 bg-white"
-                }`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs text-[#78716C]">
-                      Charge #{charge.id} · Room {charge.room_number}
-                    </p>
-
-                    <h2
-                      className="mt-1 break-words font-heading
-                        text-base font-semibold text-[#173F35]"
-                    >
-                      {charge.resident_username || "Resident unavailable"}
-                    </h2>
-                  </div>
-
-                  <PaymentBadge status={charge.payment_summary?.status} />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-                  <dl className="grid flex-1 grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                    {[
-                      ["Billing month", charge.billing_month?.slice(0, 7)],
-                      ["Due date", charge.due_date],
-                      ["Charge", money(charge.amount)],
-                      ["Balance", money(charge.payment_summary?.balance)],
-                    ].map(([label, value]) => (
-                      <div key={label} className="min-w-0">
-                        <dt className="text-xs text-[#78716C]">{label}</dt>
-                        <dd
-                          className={`mt-1 break-words tabular-nums ${
-                            label === "Balance"
-                              ? "font-bold text-[#245747]"
-                              : "font-medium text-[#173F35]"
-                          }`}
-                        >
-                          {value ?? "Unavailable"}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={(event) =>
-                      viewDetails(charge, event.currentTarget)
-                    }
-                    aria-label={`View details for charge #${charge.id}`}
-                    aria-expanded={selected}
-                    aria-controls={selected ? "charge-details" : undefined}
-                    className={secondaryButton}
-                  >
-                    View details <span aria-hidden="true">→</span>
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Create a later monthly charge */}
       {showCreate && (
         <section
           ref={panelRef}
@@ -829,7 +859,6 @@ export default function RentPaymentsPage() {
                 Create a rent charge
               </h2>
             </div>
-
             <button
               type="button"
               disabled={busy}
@@ -841,8 +870,8 @@ export default function RentPaymentsPage() {
           </div>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#57534E]">
-            Approval already creates the initial rent charge. Use this form
-            for later months of a reserved or checked-in stay.
+            Approval already creates the initial rent charge. Use this
+            form for later months of a reserved or checked-in stay.
           </p>
 
           <form onSubmit={handleCreate} aria-busy={busy}>
@@ -888,7 +917,6 @@ export default function RentPaymentsPage() {
                   >
                     {field.label}
                   </label>
-
                   <input
                     id={`create-${field.name}`}
                     name={field.name}
@@ -905,10 +933,9 @@ export default function RentPaymentsPage() {
                     }
                     className={inputClass}
                   />
-
                   {field.name === "stay" && (
                     <p className="mt-2 text-xs leading-5 text-[#78716C]">
-                      Find the stay ID on the Resident stays page.
+                      Use the numeric stay ID from Resident stays.
                     </p>
                   )}
                 </div>
@@ -918,7 +945,6 @@ export default function RentPaymentsPage() {
                 <button type="submit" className={primaryButton}>
                   {busy ? "Saving…" : "Save charge"}
                 </button>
-
                 <button
                   type="button"
                   onClick={closePanel}
@@ -932,203 +958,210 @@ export default function RentPaymentsPage() {
         </section>
       )}
 
-      {/* Selected charge and manual payment form */}
-      {selectedCharge && !loading && !error && (
-        <section
-          id="charge-details"
-          ref={panelRef}
-          tabIndex={-1}
-          aria-labelledby="charge-details-title"
-          onKeyDown={handlePanelKeyDown}
-          className={panelClass}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#965038]">
-                Charge #{selectedCharge.id}
-              </p>
+      <form onSubmit={applyFilters} className={panelClass}>
+        <fieldset disabled={busy || loading} className="min-w-0">
+          <legend className="font-heading text-base font-semibold text-[#173F35]">
+            Find rent charges
+          </legend>
 
-              <h2
-                id="charge-details-title"
-                className="mt-1 break-words font-heading
-                  text-lg font-semibold text-[#173F35]"
-              >
-                {selectedCharge.resident_username || "Resident unavailable"}
-              </h2>
-
-              <p className="mt-1 text-sm text-[#57534E]">
-                Room {selectedCharge.room_number}
-              </p>
-
-              <div className="mt-3">
-                <PaymentBadge
-                  status={selectedCharge.payment_summary?.status}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                name: "search",
+                label: "Search room",
+                type: "search",
+                placeholder: "For example: A101",
+              },
+              {
+                name: "billing_month",
+                label: "Billing month",
+                type: "month",
+              },
+              {
+                name: "due_date",
+                label: "Due date",
+                type: "date",
+              },
+            ].map((field) => (
+              <div key={field.name} className="min-w-0">
+                <label
+                  htmlFor={`filter-${field.name}`}
+                  className={labelClass}
+                >
+                  {field.label}
+                </label>
+                <input
+                  id={`filter-${field.name}`}
+                  name={field.name}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={filterForm[field.name]}
+                  onChange={updateFilterForm}
+                  className={inputClass}
                 />
               </div>
-            </div>
+            ))}
 
-            <button
-              type="button"
-              disabled={busy}
-              onClick={closePanel}
-              className={`${secondaryButton} shrink-0`}
-            >
-              Close
-            </button>
+            <div className="min-w-0">
+              <label htmlFor="charge-ordering" className={labelClass}>
+                Sort by
+              </label>
+              <select
+                id="charge-ordering"
+                name="ordering"
+                value={filterForm.ordering}
+                onChange={updateFilterForm}
+                className={inputClass}
+              >
+                <option value="-billing_month,-id">
+                  Latest billing month
+                </option>
+                <option value="billing_month,id">
+                  Earliest billing month
+                </option>
+                <option value="amount,id">Amount: low to high</option>
+                <option value="-amount,-id">Amount: high to low</option>
+                <option value="due_date,id">Earliest due date</option>
+                <option value="-due_date,-id">Latest due date</option>
+              </select>
+            </div>
           </div>
 
-          <dl
-            className="mt-5 grid gap-4 rounded-xl
-              bg-[#FAF7F2] p-4 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {[
-              ["Stay ID", selectedCharge.stay],
-              ["Billing month", selectedCharge.billing_month?.slice(0, 7)],
-              ["Due date", selectedCharge.due_date],
-              ["Charge amount", money(selectedCharge.amount)],
-              ["Amount paid", money(selectedCharge.payment_summary?.amount_paid)],
-              ["Balance", money(selectedCharge.payment_summary?.balance)],
-              [
-                "Charge type",
-                selectedCharge.is_initial_rent ? "Initial rent" : "Monthly rent",
-              ],
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="text-xs text-[#78716C]">{label}</dt>
-                <dd className="mt-1 break-words text-sm font-semibold text-[#173F35]">
-                  {value ?? "Unavailable"}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {balanceCents === null && (
-            <p className="mt-4 text-sm leading-6 text-amber-800">
-              The balance is unavailable. Refresh the charge before
-              recording a payment.
-            </p>
-          )}
-
-          {balanceCents === 0 && (
-            <p className="mt-4 text-sm font-medium text-[#245747]">
-              This charge has no remaining balance.
-            </p>
-          )}
-
-          {hasBalance && !showPayment && (
-            <div className="mt-5 border-t border-[#245747]/10 pt-4">
-              <button
-                type="button"
-                disabled={locked}
-                onClick={() => setShowPayment(true)}
-                className={primaryButton}
-              >
-                Record payment
-              </button>
-            </div>
-          )}
-
-          {hasBalance && showPayment && (
-            <form
-              onSubmit={handlePayment}
-              aria-busy={busy}
-              className="mt-5 border-t border-[#245747]/10 pt-5"
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="submit" className={primaryButton}>
+              Apply filters
+            </button>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className={secondaryButton}
             >
-              <h3 className="font-heading text-base font-semibold text-[#173F35]">
-                Record received payment
-              </h3>
+              Clear filters
+            </button>
+          </div>
+        </fieldset>
+      </form>
 
-              <p className="mt-2 text-sm leading-6 text-[#57534E]">
-                Record only confirmed cash or bank payments.
-                {selectedCharge.is_initial_rent &&
-                  " Initial rent requires full payment before the hold expires."}
-              </p>
+      {loading ? (
+        <p role="status" className={`${panelClass} text-sm text-[#57534E]`}>
+          Loading charges…
+        </p>
+      ) : error ? (
+        <div
+          role="alert"
+          className="rounded-xl bg-red-50 p-4 text-sm leading-6 text-red-800"
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="mt-3 min-h-11 font-semibold underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : charges.length === 0 ? (
+        <div className={`${panelClass} py-9 text-center`}>
+          <h2 className="font-heading text-base font-semibold text-[#173F35]">
+            No charges found
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            No charges match this view. Try clearing the filters.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-[#245747]/15 bg-white">
+          {charges.map((charge) => {
+            const selected = selectedCharge?.id === charge.id;
+            const balance = toCents(charge.payment_summary?.balance);
+            const canPay = balance !== null && balance > 0;
 
-              <fieldset
-                disabled={locked}
-                className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            return (
+              <article
+                key={charge.id}
+                className="min-w-0 border-b border-[#245747]/10 last:border-b-0"
               >
-                <legend className="sr-only">Payment details</legend>
+                <div
+                  className={`grid min-w-0 gap-4 p-4 sm:p-5
+                    xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]
+                    ${selected ? "bg-[#EDF3E8]/70" : ""}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="break-words font-heading text-base font-semibold text-[#173F35]">
+                        {residentLabel(charge)}
+                      </h2>
+                      <span className="rounded-md bg-[#E8EDE4] px-2 py-1 text-xs font-medium text-[#245747]">
+                        Room {charge.room_number || "unavailable"}
+                      </span>
+                      <PaymentBadge status={charge.payment_summary?.status} />
+                    </div>
 
-                <div className="min-w-0">
-                  <label htmlFor="payment-amount" className={labelClass}>
-                    Amount received (KES)
-                  </label>
-                  <input
-                    id="payment-amount"
-                    type="number"
-                    min="0.01"
-                    max={selectedCharge.payment_summary.balance}
-                    step="0.01"
-                    required
-                    value={paymentForm.amount}
-                    onChange={(event) =>
-                      setPaymentForm((previous) => ({
-                        ...previous,
-                        amount: event.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                  />
+                    <p className="mt-2 text-sm font-medium text-[#57534E]">
+                      {formatDate(charge.billing_month, true)} rent
+                      {charge.is_initial_rent && (
+                        <span className="ml-2 text-xs text-[#965038]">
+                          Initial rent
+                        </span>
+                      )}
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#78716C]">
+                      Due {formatDate(charge.due_date)}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <dl className="grid grid-cols-2 gap-4">
+                      <DetailItem label="Amount" value={money(charge.amount)} />
+                      <div className="min-w-0">
+                        <dt className="text-xs text-[#78716C]">Balance</dt>
+                        <dd className="mt-1 break-words text-sm font-bold tabular-nums text-[#245747]">
+                          {money(charge.payment_summary?.balance)}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={(event) =>
+                          selected
+                            ? closePanel()
+                            : openCharge(charge, event.currentTarget)
+                        }
+                        aria-label={`${selected ? "Hide" : "View"} details for ${residentLabel(charge)}, room ${charge.room_number}, ${formatDate(charge.billing_month, true)}`}
+                        aria-expanded={selected}
+                        aria-controls={
+                          selected ? `charge-details-${charge.id}` : undefined
+                        }
+                        className={secondaryButton}
+                      >
+                        {selected ? "Hide details" : "View details"}
+                      </button>
+
+                      {canPay && (
+                        <button
+                          type="button"
+                          disabled={locked}
+                          onClick={(event) =>
+                            openCharge(charge, event.currentTarget, true)
+                          }
+                          className={primaryButton}
+                        >
+                          Record payment
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <label htmlFor="payment-method" className={labelClass}>
-                    Payment method
-                  </label>
-                  <select
-                    id="payment-method"
-                    value={paymentForm.method}
-                    onChange={(event) =>
-                      setPaymentForm((previous) => ({
-                        ...previous,
-                        method: event.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="bank">Bank transfer</option>
-                  </select>
-                </div>
-
-                <div className="min-w-0">
-                  <label htmlFor="payment-reference" className={labelClass}>
-                    Receipt / transaction reference
-                  </label>
-                  <input
-                    id="payment-reference"
-                    type="text"
-                    required
-                    maxLength={100}
-                    value={paymentForm.reference}
-                    onChange={(event) =>
-                      setPaymentForm((previous) => ({
-                        ...previous,
-                        reference: event.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
-                  <button type="submit" className={primaryButton}>
-                    {busy ? "Recording…" : "Save payment"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPayment(false)}
-                    className={secondaryButton}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </fieldset>
-            </form>
-          )}
-        </section>
+                {selected && renderChargeDetails(charge)}
+              </article>
+            );
+          })}
+        </div>
       )}
 
       <nav
@@ -1143,9 +1176,7 @@ export default function RentPaymentsPage() {
         >
           Previous
         </button>
-
         <span className="text-sm text-[#57534E]">Page {page}</span>
-
         <button
           type="button"
           disabled={loading || busy || Boolean(error) || !hasNext}
