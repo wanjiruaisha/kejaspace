@@ -119,9 +119,7 @@ export default function RegisterPage() {
     }
 
     if (form.password !== form.confirm_password) {
-      validationErrors.confirm_password = [
-        "Your passwords do not match.",
-      ];
+      validationErrors.confirm_password = ["Your passwords do not match."];
     }
 
     if (Object.keys(validationErrors).length > 0) {
@@ -215,7 +213,10 @@ export default function RegisterPage() {
             </svg>
           </span>
 
-          <p role="status" className="mt-4 text-xs font-semibold text-[#245747]">
+          <p
+            role="status"
+            className="mt-4 text-xs font-semibold text-[#245747]"
+          >
             Registration successful
           </p>
 
@@ -230,8 +231,8 @@ export default function RegisterPage() {
 
         <div className="p-5 sm:p-6">
           <p className="text-sm leading-6 text-[#57534E]">
-            Your account is ready. Log in to apply for a room and
-            start managing your stay.
+            Your account is ready. Log in to apply for a room and start managing
+            your stay.
           </p>
 
           <Link to="/login" className={`mt-5 w-full ${buttonStyle}`}>
@@ -296,8 +297,8 @@ export default function RegisterPage() {
           </h2>
 
           <p className="mt-3 text-sm leading-6 text-[#E2EBE4]">
-            Find a room that suits you, follow your application
-            and keep your hostel life organised.
+            Find a room that suits you, follow your application and keep your
+            hostel life organised.
           </p>
         </div>
       </div>
@@ -359,16 +360,11 @@ export default function RegisterPage() {
           onSubmit={handleSubmit}
           aria-busy={submitting}
           aria-describedby={
-            Object.keys(errors).length > 0
-              ? "register-errors"
-              : undefined
+            Object.keys(errors).length > 0 ? "register-errors" : undefined
           }
           className="mt-5"
         >
-          <fieldset
-            disabled={submitting}
-            className="min-w-0 space-y-3.5"
-          >
+          <fieldset disabled={submitting} className="min-w-0 space-y-3.5">
             <legend className="sr-only">Account details</legend>
 
             {fields.map((field) => {
@@ -387,7 +383,8 @@ export default function RegisterPage() {
 
                     {field.name === "phone_number" && (
                       <span className="font-normal text-[#78716C]">
-                        {" "}(optional)
+                        {" "}
+                        (optional)
                       </span>
                     )}
                   </label>
@@ -412,35 +409,55 @@ export default function RegisterPage() {
                       required={field.name !== "phone_number"}
                       aria-invalid={hasError}
                       aria-describedby={
-                        hasError
-                          ? `${inputId}-error`
-                          : undefined
+                        hasError ? `${inputId}-error` : undefined
                       }
                       className={`${inputStyle} ${
-                        hasError
-                          ? "border-red-400"
-                          : "border-[#245747]/20"
+                        hasError ? "border-red-400" : "border-[#245747]/20"
                       } ${isPassword ? "pr-20" : ""}`}
                     />
 
                     {isPassword && (
                       <button
                         type="button"
-                        aria-label={`${
-                          visible ? "Hide" : "Show"
-                        } ${field.label.toLowerCase()}`}
+                        aria-label={`${visible ? "Hide" : "Show"} ${field.label.toLowerCase()}`}
                         aria-controls={inputId}
+                        title={visible ? "Hide password" : "Show password"}
+                        disabled={submitting}
                         onClick={() => togglePassword(field.name)}
-                        className="absolute inset-y-0 right-1 my-0.5
-                          inline-flex min-w-14 items-center justify-center
-                          rounded-lg px-2 text-xs font-semibold
-                          text-[#245747] hover:bg-[#E8EDE4]
-                          focus-visible:outline-2
-                          focus-visible:outline-offset-2
-                          focus-visible:outline-[#245747]
-                          disabled:cursor-not-allowed disabled:opacity-50"
+                        className="absolute right-1 top-1/2 inline-flex size-11
+      -translate-y-1/2 items-center justify-center rounded-lg
+      text-[#245747] transition-colors hover:bg-[#E8EDE4]
+      focus-visible:outline-2 focus-visible:outline-offset-2
+      focus-visible:outline-[#245747]
+      disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {visible ? "Hide" : "Show"}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          {visible ? (
+                            <>
+                              <path d="m3 3 18 18" />
+                              <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                              <path d="M9.9 5.2A11 11 0 0 1 12 5c7 0 10 7 10 7a16 16 0 0 1-3.1 4.2" />
+                              <path d="M6.5 6.5A16 16 0 0 0 2 12s3 7 10 7a11 11 0 0 0 5.5-1.5" />
+                            </>
+                          ) : (
+                            <>
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </>
+                          )}
+                        </svg>
                       </button>
                     )}
                   </div>

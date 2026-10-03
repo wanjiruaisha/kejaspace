@@ -129,8 +129,8 @@ export default function LoginPage() {
           </h2>
 
           <p className="mt-3 text-sm leading-6 text-[#E2EBE4]">
-            Check your applications, keep up with hostel notices
-            and pick up where you left off.
+            Check your applications, keep up with hostel notices and pick up
+            where you left off.
           </p>
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function LoginPage() {
                 Password
               </label>
 
-              <div className="relative">
+              <div className="relative mt-2">
                 <input
                   id="login-password"
                   name="password"
@@ -228,27 +228,55 @@ export default function LoginPage() {
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Enter your password"
                   required
-                  className={`${inputStyle} pr-20`}
+                  className={`${inputStyle.replace("mt-2 ", "")} pr-14`}
                 />
 
                 <button
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-controls="login-password"
+                  title={showPassword ? "Hide password" : "Show password"}
+                  disabled={submitting}
                   onClick={() => setShowPassword((previous) => !previous)}
-                  className="absolute bottom-1 right-1 inline-flex
-                    min-h-11 items-center justify-center rounded-lg
-                    px-3 text-xs font-semibold text-[#245747]
-                    hover:bg-[#E8EDE4]
-                    focus-visible:outline-2 focus-visible:outline-offset-2
-                    focus-visible:outline-[#245747]
-                    disabled:cursor-not-allowed disabled:opacity-50"
+                  className="absolute right-1 top-1/2 inline-flex size-11
+        -translate-y-1/2 items-center justify-center rounded-lg
+        text-[#245747] transition-colors hover:bg-[#E8EDE4]
+        focus-visible:outline-2 focus-visible:outline-offset-2
+        focus-visible:outline-[#245747]
+        disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    {showPassword ? (
+                      <>
+                        {/* Crossed eye: click to hide the password */}
+                        <path d="m3 3 18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.9 5.2A11 11 0 0 1 12 5c7 0 10 7 10 7a16 16 0 0 1-3.1 4.2" />
+                        <path d="M6.5 6.5A16 16 0 0 0 2 12s3 7 10 7a11 11 0 0 0 5.5-1.5" />
+                      </>
+                    ) : (
+                      <>
+                        {/* Open eye: click to show the password */}
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    )}
+                  </svg>
                 </button>
               </div>
             </div>
-
             <button
               type="submit"
               disabled={submitting}
