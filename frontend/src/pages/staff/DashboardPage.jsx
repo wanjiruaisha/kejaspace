@@ -88,9 +88,7 @@ function StatCard({ label, value, description, icon, tone }) {
         {numberFormatter.format(value)}
       </p>
 
-      <p className="mt-2 text-xs leading-5 text-[#78716C]">
-        {description}
-      </p>
+      <p className="mt-2 text-xs leading-5 text-[#78716C]">{description}</p>
     </article>
   );
 }
@@ -164,9 +162,7 @@ function StayOverview({ stays }) {
               {numberFormatter.format(total)}
             </span>
 
-            <span className="mt-1 text-xs text-[#78716C]">
-              Stays shown
-            </span>
+            <span className="mt-1 text-xs text-[#78716C]">Stays shown</span>
           </div>
         </div>
 
@@ -212,8 +208,8 @@ function StayOverview({ stays }) {
       )}
 
       <p className="mt-5 border-t border-[#245747]/10 pt-3 text-xs leading-5 text-[#78716C]">
-        This shows the mix of stay statuses, not the percentage of room
-        capacity occupied.
+        This shows the mix of stay statuses, not the percentage of room capacity
+        occupied.
       </p>
     </section>
   );
@@ -226,9 +222,7 @@ function ActivityTooltip({ active, payload }) {
 
   return (
     <div className="max-w-60 rounded-xl border border-[#245747]/20 bg-white p-3 shadow-lg">
-      <p className="text-sm font-semibold text-[#173F35]">
-        {item.label}
-      </p>
+      <p className="text-sm font-semibold text-[#173F35]">{item.label}</p>
 
       <p className="mt-1 text-sm text-[#57534E]">
         {numberFormatter.format(item.value)} {item.unit}
@@ -284,33 +278,34 @@ function ActivityBarChart({ dashboard }) {
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
             data={data}
-            layout="vertical"
             accessibilityLayer
-            margin={{ top: 10, right: 24, bottom: 5, left: 0 }}
-            barCategoryGap="35%"
+            margin={{ top: 25, right: 10, bottom: 10, left: 0 }}
+            barCategoryGap="30%"
           >
             <CartesianGrid
-              horizontal={false}
+              vertical={false}
               stroke="#E8EDE4"
               strokeDasharray="4 4"
             />
 
             <XAxis
-              type="number"
-              allowDecimals={false}
-              domain={[0, maximum]}
+              type="category"
+              dataKey="label"
+              interval={0}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#78716C", fontSize: 12 }}
+              tick={{ fill: "#57534E", fontSize: 11 }}
+              tickMargin={10}
             />
 
             <YAxis
-              type="category"
-              dataKey="label"
-              width={100}
+              type="number"
+              allowDecimals={false}
+              domain={[0, maximum]}
+              width={35}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#57534E", fontSize: 12 }}
+              tick={{ fill: "#78716C", fontSize: 12 }}
             />
 
             <Tooltip
@@ -322,9 +317,14 @@ function ActivityBarChart({ dashboard }) {
               dataKey="value"
               name="Records"
               fill="#245747"
-              radius={[0, 6, 6, 0]}
-              maxBarSize={30}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={55}
               isAnimationActive={false}
+              label={{
+                position: "top",
+                fill: "#173F35",
+                fontSize: 12,
+              }}
             />
           </BarChart>
         </ResponsiveContainer>
@@ -462,9 +462,8 @@ export default function DashboardPage() {
           </h1>
 
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
-            Welcome back{user?.username ? `, ${user.username}` : ""}.
-            {" "}Check current stays, follow up on requests and keep
-            things moving.
+            Welcome back{user?.username ? `, ${user.username}` : ""}. Check
+            current stays, follow up on requests and keep things moving.
           </p>
         </div>
 
@@ -582,8 +581,8 @@ export default function DashboardPage() {
               </p>
 
               <p className="mt-4 text-sm leading-6 text-[#E2EBE4]">
-                View individual records and rent charges to follow up
-                on residents’ balances.
+                View individual records and rent charges to follow up on
+                residents’ balances.
               </p>
 
               <div className="mt-auto pt-5">
@@ -665,9 +664,9 @@ export default function DashboardPage() {
 
               {dashboard.payments.mpesa_attempts_needing_review > 0 && (
                 <p className="mx-4 mb-4 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900 sm:mx-5">
-                  M-Pesa attempts marked for review are not proof of
-                  successful payment. Confirm their outcome before
-                  recording another payment for the same transaction.
+                  M-Pesa attempts marked for review are not proof of successful
+                  payment. Confirm their outcome before recording another
+                  payment for the same transaction.
                 </p>
               )}
             </section>
@@ -695,25 +694,25 @@ export default function DashboardPage() {
               </p>
 
               <p>
-                The round chart covers stay statuses across all rooms.
-                Use the occupancy report for room-by-room allocations.
+                The round chart covers stay statuses across all rooms. Use the
+                occupancy report for room-by-room allocations.
               </p>
 
               <p>
-                The bar chart compares current pending applications,
-                unresolved maintenance requests and M-Pesa attempts
-                requiring review. It does not show monthly trends.
+                The bar chart compares current pending applications, unresolved
+                maintenance requests and M-Pesa attempts requiring review. It
+                does not show monthly trends.
               </p>
 
               <p>
-                Recorded payments are an all-time total, not outstanding
-                rent or payments received today.
+                Recorded payments are an all-time total, not outstanding rent or
+                payments received today.
               </p>
 
               <p>
                 The M-Pesa review count identifies attempts requiring
-                investigation. This dashboard does not include their
-                review screen.
+                investigation. This dashboard does not include their review
+                screen.
               </p>
             </div>
           </details>
