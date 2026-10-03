@@ -4,8 +4,6 @@
 
 KejaSpace is a full-stack hostel management application that brings room applications, resident stays, rent records and everyday hostel services into one system. Residents manage their accommodation through a React website, while staff and administrators use a separate management interface.
 
-Built as a Software Developer Core project at Zindua School.
-
 
 ## Features
 
