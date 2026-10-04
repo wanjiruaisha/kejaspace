@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import useAuth from "../../hooks/useAuth";
+import SocialLinks from "../common/SocialLinks";
 
 const residentLinks = [
   { label: "My applications", to: "/my-applications" },
@@ -106,6 +107,10 @@ export default function Footer() {
             <p className="mt-5 text-xs font-medium tracking-wide text-[#E9BC9F]">
               Your space. Your stay. Simplified.
             </p>
+            {/* Instagram and TikTok links */}
+            <div className="mt-6">
+              <SocialLinks dark />
+            </div>
           </div>
 
           {/* General navigation */}
@@ -226,8 +231,6 @@ export default function Footer() {
             sm:mt-10 sm:flex-row sm:items-center sm:justify-between"
         >
           <p>© {new Date().getFullYear()} KejaSpace. All rights reserved.</p>
-
-          <p>A little less admin. A little more living.</p>
         </div>
       </div>
     </footer>
