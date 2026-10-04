@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import SocialLinks from "../components/common/SocialLinks";
 
 const email = "wanjiruaisha30@gmail.com";
 const phone = "+254797959709";
@@ -371,7 +372,7 @@ export default function ContactPage() {
                 border border-[#245747]/10 bg-white/80 p-4"
             >
               <p className="text-sm leading-6 text-[#57534E]">
-                “Hi Aisha! I have a question about KejaSpace.”
+                “hello! I have a question about KejaSpace.”
               </p>
               <p className="mt-2 text-xs text-[#78716C]">
                 A starting point—you can edit it before sending.
@@ -396,6 +397,18 @@ export default function ContactPage() {
             </div>
           </article>
         </div>
+      </section>
+
+      <section
+        className="rounded-2xl border border-[#245747]/15
+    bg-[#FAF7F2] p-5 sm:p-6"
+      >
+        <SocialLinks />
+
+        <p className="mt-3 text-xs leading-6 text-[#78716C]">
+          Personal social accounts. For KejaSpace enquiries, use email or
+          WhatsApp above.
+        </p>
       </section>
 
       {/* Brief guidance */}
@@ -435,8 +448,6 @@ export default function ContactPage() {
           gap-4 border-t border-[#245747]/15 pt-5
           sm:flex-row sm:items-center"
       >
-       
-
         <Link
           to="/rooms"
           className="inline-flex min-h-11 shrink-0 items-center
