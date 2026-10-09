@@ -4,16 +4,17 @@ import { Link, NavLink, useLocation } from "react-router";
 import useAuth from "../../hooks/useAuth";
 import LogoutButton from "../auth/LogoutButton";
 import LoadingMessage from "../common/LoadingMessage";
+import { Menu, X } from "lucide-react";
 
 const publicLinks = [
   { label: "Home", to: "/" },
   { label: "Rooms", to: "/rooms" },
   { label: "About", to: "/about" },
-   {
-  label: "Contact",
-  to: "/contact",
-  roles: ["guest", "resident", "staff", "admin"],
-  }, 
+  {
+    label: "Contact",
+    to: "/contact",
+    roles: ["guest", "resident", "staff", "admin"],
+  },
 ];
 
 const accountLinks = [
@@ -77,7 +78,6 @@ const accountLinks = [
     to: "/announcements",
     roles: ["resident", "staff", "admin"],
   },
- 
 ];
 
 const adminLinks = [
@@ -114,9 +114,7 @@ export default function Navbar() {
         ? "staff"
         : "resident";
 
-  const visibleLinks = accountLinks.filter((item) =>
-    item.roles.includes(role),
-  );
+  const visibleLinks = accountLinks.filter((item) => item.roles.includes(role));
 
   useEffect(() => {
     setMenuOpen(false);
@@ -247,9 +245,7 @@ export default function Navbar() {
               aria-expanded={menuOpen}
               aria-controls="navbar-menu"
               aria-label={
-                menuOpen
-                  ? "Close navigation menu"
-                  : "Open navigation menu"
+                menuOpen ? "Close navigation menu" : "Open navigation menu"
               }
               onClick={() => setMenuOpen((previous) => !previous)}
               className="inline-flex min-h-11 shrink-0 items-center
@@ -264,30 +260,11 @@ export default function Navbar() {
                 {menuOpen ? "Close" : "Menu"}
               </span>
 
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                {menuOpen ? (
-                  <>
-                    <path d="M6 6l12 12" />
-                    <path d="M6 18L18 6" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M4 6h16" />
-                    <path d="M4 12h16" />
-                    <path d="M4 18h16" />
-                  </>
-                )}
-              </svg>
+              {menuOpen ? (
+                <X size={22} aria-hidden="true" />
+              ) : (
+                <Menu size={22} aria-hidden="true" />
+              )}
             </button>
           </div>
         </div>
@@ -344,10 +321,7 @@ export default function Navbar() {
 
           <div className="p-3">
             {/* Public links in the mobile menu */}
-            <nav
-              aria-label="Mobile navigation"
-              className="space-y-1 md:hidden"
-            >
+            <nav aria-label="Mobile navigation" className="space-y-1 md:hidden">
               {publicLinks.map((item) => (
                 <NavLink
                   key={item.to}
