@@ -219,26 +219,68 @@ export default function Navbar() {
               </NavLink>
             ))}
           </nav>
+            {/* Desktop account controls */}
+            <div className="hidden shrink-0 items-center gap-3 md:flex">
+              {authLoading ? (
+                <span role="status" className="text-sm text-[#57534E]">
+                  Checking session…
+                </span>
+              ) : user ? (
+                <>
+                  <span className="hidden max-w-32 truncate text-sm font-medium text-[#173F35] xl:block">
+                    Hi, {user.username}
+                  </span>
 
-          {/* Account and menu controls */}
-          <div className="flex min-w-0 items-center gap-3">
-            {!authLoading && !user && (
-              <Link
-                to="/login"
-                className="hidden rounded-lg px-3 py-2 text-sm
-                  font-semibold text-[#173F35] transition
-                  hover:bg-white/50 sm:inline-flex"
-              >
-                Log in
-              </Link>
-            )}
+                  <Link
+                    to={
+                      user.is_staff || user.is_superuser
+                        ? "/staff/dashboard"
+                        : "/my-applications"
+                    }
+                    className="inline-flex min-h-11 items-center
+                      justify-center gap-2 rounded-xl bg-[#245747]
+                      px-4 py-2.5 text-sm font-semibold text-white
+                      shadow-sm transition-colors hover:bg-[#173F35]
+                      focus-visible:outline-2 focus-visible:outline-offset-4
+                      focus-visible:outline-[#245747]"
+                  >
+                    {user.is_staff || user.is_superuser
+                      ? "Dashboard"
+                      : "My account"}
 
-            {!authLoading && user && (
-              <span className="hidden max-w-32 truncate text-sm font-medium text-[#173F35] lg:block">
-                Hi, {user.username}
-              </span>
-            )}
+                    <span aria-hidden="true">→</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="inline-flex min-h-11 items-center
+                      justify-center rounded-xl px-3 py-2.5
+                      text-sm font-semibold text-[#245747]
+                      transition-colors hover:bg-white/70
+                      focus-visible:outline-2 focus-visible:outline-offset-4
+                      focus-visible:outline-[#245747]"
+                  >
+                    Log in
+                  </Link>
 
+                  <Link
+                    to="/register"
+                    className="inline-flex min-h-11 items-center
+                      justify-center rounded-xl bg-[#245747]
+                      px-4 py-2.5 text-sm font-semibold text-white
+                      shadow-sm transition-colors hover:bg-[#173F35]
+                      focus-visible:outline-2 focus-visible:outline-offset-4
+                      focus-visible:outline-[#245747]"
+                  >
+                    Create account
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Mobile menu button */}
             <button
               ref={toggleRef}
               type="button"
@@ -254,7 +296,7 @@ export default function Navbar() {
                 text-[#173F35] shadow-sm backdrop-blur-md transition
                 hover:border-[#245747]/25 hover:bg-white/90
                 focus-visible:outline-2 focus-visible:outline-offset-4
-                focus-visible:outline-[#245747]"
+                focus-visible:outline-[#245747] md:hidden"
             >
               <span className="hidden sm:inline">
                 {menuOpen ? "Close" : "Menu"}
@@ -279,7 +321,7 @@ export default function Navbar() {
             max-w-[calc(100vw-2rem)] overflow-y-auto
             overscroll-contain rounded-2xl border border-[#245747]/15
             bg-[#FCFAF6] shadow-[0_20px_60px_rgba(23,63,53,0.18)]
-            sm:right-8"
+            sm:right-8 md:hidden"
         >
           {/* Account information */}
           <div className="border-b border-[#245747]/10 bg-[#E8EDE4]/60 p-4">
@@ -416,7 +458,6 @@ export default function Navbar() {
             </div>
           )}
         </div>
-      </div>
     </header>
   );
 }
