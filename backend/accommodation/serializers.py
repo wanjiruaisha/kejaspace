@@ -13,12 +13,21 @@ class ApplicationSerializer(serializers.ModelSerializer):
     source="room.room_number",
     read_only=True,
     )
+    applicant_name = serializers.SerializerMethodField()
+
+    def get_applicant_name(self, obj):
+        return (
+        obj.applicant.get_full_name().strip()
+        or obj.applicant.username
+    )
+
 
     class Meta:
         model = AccommodationApplication
         fields = [
             "id",
             "applicant",
+            "applicant_name",
             "room",
             "room_number",
             "move_in_date",
