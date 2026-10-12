@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Search } from "lucide-react";
 
 import {
   listStaffApplications,
@@ -113,6 +114,7 @@ export default function ApplicationsPage() {
           page,
           status,
           controller.signal,
+          search,
         );
 
         if (!Array.isArray(data?.results)) {
@@ -406,9 +408,16 @@ export default function ApplicationsPage() {
             <button
               type="submit"
               disabled={actionsDisabled}
-              className={primaryButton}
+              aria-label="Search applications"
+              title="Search applications"
+              className="inline-flex size-11 shrink-0 items-center
+              justify-center rounded-full bg-[#245747] text-white
+              transition-colors hover:bg-[#173F35]
+              focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-[#245747]
+              disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Search
+             <Search size={18} aria-hidden="true" />
             </button>
 
             {(searchInput || search) && (
