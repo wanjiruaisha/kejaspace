@@ -78,15 +78,31 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
 
 
 class StaffApplicationListView(generics.ListAPIView):
-    queryset = AccommodationApplication.objects.all()
-    serializer_class = ApplicationSerializer
-    permission_classes = [IsAdminUser]        
+    queryset = AccommodationApplication.objects.select_related(
+        "applicant",
+        "room",
+    ).all()
 
+    serializer_class = ApplicationSerializer
+    permission_classes = [IsAdminUser]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
 
     filterset_fields = ["status", "room", "move_in_date"]
-    search_fields = ["room__room_number"]
+
+    search_fields = [
+        "applicant__username",
+        "applicant__first_name",
+        "applicant__last_name",
+        "room__room_number",
+    ]
+
     ordering_fields = ["id", "created_at", "move_in_date"]
-    ordering = ["-created_at", "-id"]    
+    ordering = ["-created_at", "-id"]  
 
 
 
