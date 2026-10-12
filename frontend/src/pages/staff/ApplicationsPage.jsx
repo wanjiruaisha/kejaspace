@@ -22,8 +22,7 @@ const buttonBase =
   "focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
-const primaryButton =
-  `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
+const primaryButton = `${buttonBase} bg-[#245747] text-white hover:bg-[#173F35]`;
 
 const secondaryButton =
   `${buttonBase} border border-[#245747]/20 bg-white ` +
@@ -97,6 +96,9 @@ export default function ApplicationsPage() {
   const [message, setMessage] = useState("");
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+
   const mutationRef = useRef(false);
 
   useEffect(() => {
@@ -120,9 +122,7 @@ export default function ApplicationsPage() {
         if (!controller.signal.aborted) {
           setApplications(data.results);
           setHasNext(Boolean(data.next));
-          setTotalCount(
-            Number.isInteger(data.count) ? data.count : null,
-          );
+          setTotalCount(Number.isInteger(data.count) ? data.count : null);
 
           // Unlock actions only after a successful reload.
           setNeedsRefresh(false);
@@ -145,7 +145,7 @@ export default function ApplicationsPage() {
     loadApplications();
 
     return () => controller.abort();
-  }, [page, status, retry]);
+  }, [page, status, search, retry]);
 
   function reloadList() {
     if (mutationRef.current || loading) return;
@@ -214,12 +214,7 @@ export default function ApplicationsPage() {
   }
 
   async function handleConfirm() {
-    if (
-      !confirmation ||
-      mutationRef.current ||
-      loading ||
-      needsRefresh
-    ) {
+    if (!confirmation || mutationRef.current || loading || needsRefresh) {
       return;
     }
 
@@ -247,10 +242,7 @@ export default function ApplicationsPage() {
       } else {
         const application = await rejectApplication(id);
 
-        if (
-          application?.id !== id ||
-          application.status !== "rejected"
-        ) {
+        if (application?.id !== id || application.status !== "rejected") {
           throw new Error("Unexpected rejection response.");
         }
 
@@ -269,9 +261,7 @@ export default function ApplicationsPage() {
       if ([400, 401, 403, 404].includes(err.status)) {
         setActionError(getErrorMessage(err));
       } else if (err.status === 429) {
-        setActionError(
-          "Too many requests. Please wait before trying again.",
-        );
+        setActionError("Too many requests. Please wait before trying again.");
       } else {
         setActionError(
           "We couldn’t confirm the result. Refresh the list to check " +
@@ -284,6 +274,36 @@ export default function ApplicationsPage() {
       mutationRef.current = false;
       setActing(false);
     }
+  }
+  function handleSearch(event) {
+    event.preventDefault();
+
+    if (mutationRef.current || loading || needsRefresh) return;
+
+    setSearch(searchInput.trim());
+    setPage(1);
+    setExpandedId(null);
+    setConfirmation(null);
+    setMessage("");
+    setActionError("");
+    setLoading(true);
+
+    // Also reloads when submitting the same search again.
+    setRetry((value) => value + 1);
+  }
+
+  function clearSearch() {
+    if (mutationRef.current || loading || needsRefresh) return;
+
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+    setExpandedId(null);
+    setConfirmation(null);
+    setMessage("");
+    setActionError("");
+    setLoading(true);
+    setRetry((value) => value + 1);
   }
 
   const actionsDisabled = acting || loading || needsRefresh;
@@ -323,51 +343,101 @@ export default function ApplicationsPage() {
           Refresh
         </button>
       </header>
-
-      {/* Filter toolbar */}
-      <div
-        className="flex flex-wrap items-end justify-between gap-4
-          rounded-xl border border-[#245747]/15 bg-white p-4"
+      {/* Search and status filter */}
+      <form
+        onSubmit={handleSearch}
+        className="rounded-xl border border-[#245747]/15 bg-white p-4"
       >
-        <div className="w-full sm:w-60">
-          <label
-            htmlFor="application-status"
-            className="block text-xs font-semibold text-[#173F35]"
-          >
-            Application status
-          </label>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="application-search"
+              className="block text-xs font-semibold text-[#173F35]"
+            >
+              Search applications
+            </label>
 
-          <select
-            id="application-status"
-            value={status}
-            disabled={actionsDisabled}
-            onChange={(event) => changeStatus(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-lg
-              border border-[#245747]/20 bg-[#FAF7F2]/60
-              px-3 py-2 text-sm text-[#173F35]
-              focus-visible:outline-2 focus-visible:outline-offset-2
-              focus-visible:outline-[#245747]
-              disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="">All applications</option>
-          </select>
+            <input
+              id="application-search"
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Applicant name, username or room"
+              disabled={actionsDisabled}
+              className="mt-2 min-h-11 w-full rounded-lg
+          border border-[#245747]/20 bg-[#FAF7F2]/60
+          px-3 py-2 text-sm text-[#173F35]
+          placeholder:text-[#78716C]
+          focus-visible:outline-2 focus-visible:outline-offset-2
+          focus-visible:outline-[#245747]
+          disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+
+          <div className="w-full xl:w-48">
+            <label
+              htmlFor="application-status"
+              className="block text-xs font-semibold text-[#173F35]"
+            >
+              Application status
+            </label>
+
+            <select
+              id="application-status"
+              value={status}
+              disabled={actionsDisabled}
+              onChange={(event) => changeStatus(event.target.value)}
+              className="mt-2 min-h-11 w-full rounded-lg
+          border border-[#245747]/20 bg-[#FAF7F2]/60
+          px-3 py-2 text-sm text-[#173F35]
+          focus-visible:outline-2 focus-visible:outline-offset-2
+          focus-visible:outline-[#245747]
+          disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="">All applications</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={actionsDisabled}
+              className={primaryButton}
+            >
+              Search
+            </button>
+
+            {(searchInput || search) && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                disabled={actionsDisabled}
+                className={secondaryButton}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {!loading && !error && (
-          <p className="text-xs leading-6 text-[#78716C]">
+          <p
+            role="status"
+            className="mt-3 break-words text-xs leading-6 text-[#78716C]"
+          >
             {totalCount !== null
               ? `${totalCount} matching ${
                   totalCount === 1 ? "application" : "applications"
                 }`
               : `${applications.length} on this page`}
+            {search ? ` for “${search}”` : ""}
           </p>
         )}
-      </div>
-
+      </form>
       {message && (
         <p
           role="status"
@@ -486,8 +556,6 @@ export default function ApplicationsPage() {
                           >
                             {applicantName}
                           </h2>
-
-                          
                         </div>
                       </div>
 
@@ -531,9 +599,7 @@ export default function ApplicationsPage() {
                             isExpanded ? "Hide" : "View"
                           } details for application ${application.id}`}
                           onClick={() =>
-                            setExpandedId(
-                              isExpanded ? null : application.id,
-                            )
+                            setExpandedId(isExpanded ? null : application.id)
                           }
                           className={`${buttonBase} px-2
                             text-[#245747] hover:bg-[#E8EDE4]`}
@@ -541,34 +607,33 @@ export default function ApplicationsPage() {
                           {isExpanded ? "Hide" : "Details"}
                         </button>
 
-                        {application.status === "pending" &&
-                          !isConfirming && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openConfirmation(application, "approve")
-                                }
-                                disabled={actionsDisabled}
-                                aria-label={`Approve application ${application.id}`}
-                                className={primaryButton}
-                              >
-                                Approve
-                              </button>
+                        {application.status === "pending" && !isConfirming && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openConfirmation(application, "approve")
+                              }
+                              disabled={actionsDisabled}
+                              aria-label={`Approve application ${application.id}`}
+                              className={primaryButton}
+                            >
+                              Approve
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openConfirmation(application, "reject")
-                                }
-                                disabled={actionsDisabled}
-                                aria-label={`Reject application ${application.id}`}
-                                className={rejectButton}
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openConfirmation(application, "reject")
+                              }
+                              disabled={actionsDisabled}
+                              aria-label={`Reject application ${application.id}`}
+                              className={rejectButton}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -589,7 +654,6 @@ export default function ApplicationsPage() {
                           </dd>
                         </div>
 
-                       
                         <div>
                           <dt className="text-xs text-[#78716C]">
                             Submitted · Nairobi time
@@ -602,8 +666,8 @@ export default function ApplicationsPage() {
 
                       {application.status === "approved" && (
                         <p className="mt-4 text-xs leading-6 text-[#57534E]">
-                          Check the resident’s stay and initial rent charge
-                          for payment and reservation status.
+                          Check the resident’s stay and initial rent charge for
+                          payment and reservation status.
                         </p>
                       )}
                     </div>
@@ -683,9 +747,7 @@ export default function ApplicationsPage() {
           Previous
         </button>
 
-        <span className="text-xs text-[#57534E]">
-          Page {page}
-        </span>
+        <span className="text-xs text-[#57534E]">Page {page}</span>
 
         <button
           type="button"
