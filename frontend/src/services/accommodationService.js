@@ -1,5 +1,6 @@
 import { apiRequest } from "./api";
 
+// Resident applications
 export function createApplication(roomId, moveInDate) {
   return apiRequest("/applications/", {
     method: "POST",
@@ -16,7 +17,13 @@ export function cancelApplication(applicationId) {
   });
 }
 
-export function listStaffApplications(page, status, signal) {
+// Staff applications
+export function listStaffApplications(
+  page = 1,
+  status = "",
+  signal,
+  search = "",
+) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: "6",
@@ -24,6 +31,10 @@ export function listStaffApplications(page, status, signal) {
 
   if (status) {
     params.set("status", status);
+  }
+
+  if (search.trim()) {
+    params.set("search", search.trim());
   }
 
   return apiRequest(`/staff/applications/?${params.toString()}`, {
@@ -43,14 +54,24 @@ export function rejectApplication(applicationId) {
   });
 }
 
-export function listAdminAnnouncements({ page, published, signal }) {
+// Admin announcements
+export function listAdminAnnouncements({
+  page = 1,
+  published = "",
+  search = "",
+  signal,
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: "6",
   });
 
-  if (published !== "") {
-    params.set("is_published", published);
+  if (published !== "" && published !== null && published !== undefined) {
+    params.set("is_published", String(published));
+  }
+
+  if (search.trim()) {
+    params.set("search", search.trim());
   }
 
   return apiRequest(`/admin/announcements/?${params.toString()}`, {
@@ -78,7 +99,13 @@ export function deleteAnnouncement(id) {
   });
 }
 
-export function listStaffStays({ page, status, signal }) {
+// Staff resident stays
+export function listStaffStays({
+  page = 1,
+  status = "",
+  search = "",
+  signal,
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: "6",
@@ -86,6 +113,10 @@ export function listStaffStays({ page, status, signal }) {
 
   if (status) {
     params.set("status", status);
+  }
+
+  if (search.trim()) {
+    params.set("search", search.trim());
   }
 
   return apiRequest(`/staff/stays/?${params.toString()}`, {
