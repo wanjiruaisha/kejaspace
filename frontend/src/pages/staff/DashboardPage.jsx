@@ -4,6 +4,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -99,38 +101,30 @@ function StayOverview({ stays }) {
     {
       label: "Checked in",
       value: stays.checked_in,
-      colour: "#245747",
+      fill: "#245747",
       description: "Residents currently staying",
     },
     {
       label: "Reserved",
       value: stays.reserved,
-      colour: "#879567",
+      fill: "#879567",
       description: "Confirmed, awaiting arrival",
     },
     {
       label: "Payment holds",
       value: stays.unexpired_payment_holds,
-      colour: "#C0805D",
+      fill: "#C0805D",
       description: "Unexpired holds awaiting payment",
     },
   ];
 
   const total = segments.reduce((sum, item) => sum + item.value, 0);
 
-  let cumulative = 0;
-
-  const stops = segments.map((item) => {
-    const start = cumulative;
-    cumulative += total > 0 ? (item.value / total) * 100 : 0;
-    return `${item.colour} ${start}% ${cumulative}%`;
-  });
-
-  const background =
-    total > 0 ? `conic-gradient(${stops.join(", ")})` : "#E8EDE4";
-
   return (
-    <section aria-labelledby="stay-overview-heading" className={panelStyle}>
+    <section
+      aria-labelledby="stay-overview-heading"
+      className={panelStyle}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2
@@ -151,65 +145,132 @@ function StayOverview({ stays }) {
         </Link>
       </div>
 
-      <div className="mt-6 grid items-center gap-6 sm:grid-cols-[180px_minmax(0,1fr)]">
-        <div
-          aria-hidden="true"
-          className="mx-auto flex size-44 items-center justify-center rounded-full"
-          style={{ background }}
-        >
-          <div className="flex size-32 flex-col items-center justify-center rounded-full bg-white px-3 text-center">
-            <span className="font-heading text-2xl font-bold tabular-nums text-[#173F35]">
-              {numberFormatter.format(total)}
-            </span>
+      <div className="relative mx-auto mt-5 h-64 w-full max-w-sm">
+        {total > 0 ? (
+          <>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+            >
+              <PieChart accessibilityLayer>
+                <Pie
+                  data={segments}
+                  dataKey="value"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="62%"
+                  outerRadius="86%"
+                  startAngle={90}
+                  endAngle={-270}
+                  paddingAngle={3}
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  isAnimationActive={false}
+                />
 
-            <span className="mt-1 text-xs text-[#78716C]">Stays shown</span>
-          </div>
-        </div>
+                <Tooltip
+                  formatter={(value, name) => [
+                    numberFormatter.format(Number(value)),
+                    name,
+                  ]}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid #D4E2D8",
+                    backgroundColor: "#FFFFFF",
+                    fontSize: 13,
+                  }}
+                  itemStyle={{ color: "#173F35" }}
+                  wrapperStyle={{ zIndex: 10 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
 
-        <div>
-          <p className="sr-only">
-            Total stays shown: {numberFormatter.format(total)}.
-          </p>
-
-          <dl className="space-y-4">
-            {segments.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-start justify-between gap-3"
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0
+                flex flex-col items-center justify-center"
+            >
+              <span
+                className="font-heading text-3xl font-bold
+                  tabular-nums text-[#173F35]"
               >
-                <dt>
-                  <span className="flex items-center gap-2 text-sm font-medium text-[#173F35]">
-                    <span
-                      aria-hidden="true"
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: item.colour }}
-                    />
-                    {item.label}
-                  </span>
+                {numberFormatter.format(total)}
+              </span>
 
-                  <span className="mt-1 block text-xs leading-5 text-[#78716C]">
-                    {item.description}
-                  </span>
-                </dt>
+              <span className="mt-1 text-xs text-[#78716C]">
+                Stays shown
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div
+              className="flex size-48 flex-col items-center
+                justify-center rounded-full border-[22px]
+                border-[#E8EDE4] text-center"
+            >
+              <span className="font-heading text-3xl font-bold text-[#173F35]">
+                0
+              </span>
 
-                <dd className="text-sm font-semibold tabular-nums text-[#173F35]">
-                  {numberFormatter.format(item.value)}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+              <span className="mt-1 text-xs text-[#78716C]">
+                No current stays
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {total === 0 && (
-        <p className="mt-4 text-sm text-[#57534E]">
-          No stays in these statuses yet.
-        </p>
-      )}
+      <p className="sr-only">
+        Total stays shown: {numberFormatter.format(total)}.
+      </p>
 
-      <p className="mt-5 border-t border-[#245747]/10 pt-3 text-xs leading-5 text-[#78716C]">
-        This shows the mix of stay statuses, not the percentage of room capacity
-        occupied.
+      <dl className="mt-4 space-y-3">
+        {segments.map((item) => (
+          <div
+            key={item.label}
+            className="flex items-start justify-between gap-4"
+          >
+            <dt>
+              <span
+                className="flex items-center gap-2 text-sm
+                  font-medium text-[#173F35]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: item.fill }}
+                />
+                {item.label}
+              </span>
+
+              <span className="mt-1 block text-xs leading-5 text-[#78716C]">
+                {item.description}
+              </span>
+            </dt>
+
+            <dd className="shrink-0 text-right">
+              <span className="text-sm font-semibold tabular-nums text-[#173F35]">
+                {numberFormatter.format(item.value)}
+              </span>
+
+              <span className="mt-1 block text-xs text-[#78716C]">
+                {total > 0
+                  ? `${Math.round((item.value / total) * 100)}%`
+                  : "—"}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <p
+        className="mt-5 border-t border-[#245747]/10
+          pt-3 text-xs leading-5 text-[#78716C]"
+      >
+        Percentages represent the stays shown, not room occupancy.
       </p>
     </section>
   );
