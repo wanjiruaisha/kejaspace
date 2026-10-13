@@ -74,7 +74,6 @@ function RoomPhoto({ room }) {
 
       {showImage && (
         <figcaption className="mt-2 text-xs leading-5 text-[#78716C]">
-          Illustrative photo. Actual room appearance may differ.
         </figcaption>
       )}
     </figure>
