@@ -44,7 +44,7 @@ const paymentStatuses = {
 
 const buttonBase =
   "inline-flex min-h-11 items-center justify-center gap-2 " +
-  "rounded-xl px-4 py-2 text-sm font-semibold transition-colors " +
+  "rounded-lg px-3 py-2 text-xs font-semibold transition-colors " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-50";
@@ -57,7 +57,7 @@ const secondaryButton =
   "text-[#245747] hover:bg-[#E8EDE4]";
 
 const inputClass =
-  "mt-2 min-h-11 w-full min-w-0 rounded-xl " +
+  "mt-2 min-h-11 w-full min-w-0 rounded-lg " +
   "border border-[#245747]/20 bg-white px-3 py-2.5 " +
   "text-sm text-[#173F35] placeholder:text-[#78716C] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 " +
@@ -65,12 +65,16 @@ const inputClass =
   "disabled:cursor-not-allowed disabled:opacity-60";
 
 const labelClass =
-  "block text-sm font-semibold text-[#173F35]";
+  "block text-xs font-semibold text-[#173F35]";
 
 const panelClass =
-  "min-w-0 scroll-mt-24 rounded-2xl border border-[#245747]/15 " +
+  "min-w-0 scroll-mt-24 rounded-xl border border-[#245747]/15 " +
   "bg-white p-4 sm:p-5 focus-visible:outline-2 " +
   "focus-visible:outline-offset-4 focus-visible:outline-[#245747]";
+
+const rowGrid =
+  "grid min-w-0 grid-cols-2 items-center gap-x-4 gap-y-3 " +
+  "lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_120px]";
 
 const currencyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",
@@ -91,7 +95,7 @@ function money(value) {
   return currencyFormatter.format(Number(value));
 }
 
-// Compare money using whole cents.
+// Compare monetary values using whole cents.
 function toCents(value) {
   const text = String(value ?? "").trim();
 
@@ -107,12 +111,14 @@ function toCents(value) {
 function formatDate(value, monthOnly = false) {
   if (!value) return "Unavailable";
 
-  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+  const date = new Date(
+    `${String(value).slice(0, 10)}T00:00:00Z`,
+  );
 
   if (Number.isNaN(date.getTime())) return "Unavailable";
 
   return new Intl.DateTimeFormat("en-KE", {
-    month: "long",
+    month: "short",
     year: "numeric",
     ...(monthOnly ? {} : { day: "numeric" }),
     timeZone: "UTC",
@@ -159,8 +165,8 @@ function PaymentBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full
-        px-2.5 py-1 text-xs font-medium ${details.classes}`}
+      className={`inline-flex rounded-full px-2.5 py-1
+        text-xs font-medium ${details.classes}`}
     >
       {details.label}
     </span>
@@ -171,7 +177,7 @@ function DetailItem({ label, value }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-[#78716C]">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[#173F35]">
+      <dd className="mt-1 break-words text-sm font-medium text-[#173F35]">
         {value ?? "Unavailable"}
       </dd>
     </div>
@@ -186,15 +192,23 @@ export default function RentPaymentsPage() {
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
 
-  const [filterForm, setFilterForm] = useState({ ...defaultFilters });
-  const [filters, setFilters] = useState({ ...defaultFilters });
+  const [filterForm, setFilterForm] = useState({
+    ...defaultFilters,
+  });
+  const [filters, setFilters] = useState({
+    ...defaultFilters,
+  });
 
   const [showCreate, setShowCreate] = useState(false);
-  const [chargeForm, setChargeForm] = useState({ ...emptyCharge });
+  const [chargeForm, setChargeForm] = useState({
+    ...emptyCharge,
+  });
 
   const [selectedCharge, setSelectedCharge] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ ...emptyPayment });
+  const [paymentForm, setPaymentForm] = useState({
+    ...emptyPayment,
+  });
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -289,7 +303,14 @@ export default function RentPaymentsPage() {
   }
 
   function changePage(nextPage) {
-    if (mutationLock.current || loading || nextPage < 1) return;
+    if (
+      mutationLock.current ||
+      loading ||
+      nextPage < 1 ||
+      nextPage === page
+    ) {
+      return;
+    }
 
     resetPanels();
     setLoading(true);
@@ -314,7 +335,6 @@ export default function RentPaymentsPage() {
     setPage(1);
     setLoading(true);
     setMessage("");
-
     setFilters({
       ...filterForm,
       search: filterForm.search.trim(),
@@ -342,14 +362,13 @@ export default function RentPaymentsPage() {
     setShowCreate(true);
   }
 
-  function openCharge(charge, button, payment = false) {
+  function openCharge(charge, button) {
     if (mutationLock.current || loading) return;
-    if (payment && needsReview) return;
 
     triggerRef.current = button;
     setSelectedCharge(charge);
     setShowCreate(false);
-    setShowPayment(payment);
+    setShowPayment(false);
     setMessage("");
 
     if (!needsReview) setActionError("");
@@ -370,8 +389,9 @@ export default function RentPaymentsPage() {
     } else {
       setNeedsReview(true);
       setActionError(
-        "We could not confirm whether this was saved. Do not submit again yet. " +
-          "Check the charge and recorded payments before continuing.",
+        "We could not confirm whether this was saved. " +
+          "Do not submit again yet. Check the charge and recorded " +
+          "payments before continuing.",
       );
     }
   }
@@ -549,13 +569,13 @@ export default function RentPaymentsPage() {
         aria-labelledby={`charge-heading-${charge.id}`}
         onKeyDown={handlePanelKeyDown}
         className="scroll-mt-24 border-t border-[#245747]/15
-          bg-[#FAF7F2]/70 p-4 sm:p-5
+          bg-[#FAF7F2] p-4 sm:p-5
           focus-visible:outline-2 focus-visible:outline-[#245747]"
       >
         <div className="flex items-center justify-between gap-3">
           <h3
             id={`charge-heading-${charge.id}`}
-            className="font-heading text-base font-semibold text-[#173F35]"
+            className="text-sm font-semibold text-[#173F35]"
           >
             Charge details
           </h3>
@@ -570,11 +590,8 @@ export default function RentPaymentsPage() {
           </button>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <DetailItem
-            label="Resident"
-            value={residentLabel(charge)}
-          />
+        <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <DetailItem label="Resident" value={residentLabel(charge)} />
           <DetailItem label="Room" value={charge.room_number} />
           <DetailItem
             label="Billing month"
@@ -584,10 +601,7 @@ export default function RentPaymentsPage() {
             label="Due date"
             value={formatDate(charge.due_date)}
           />
-          <DetailItem
-            label="Charge amount"
-            value={money(charge.amount)}
-          />
+          <DetailItem label="Charge amount" value={money(charge.amount)} />
           <DetailItem
             label="Amount paid"
             value={money(charge.payment_summary?.amount_paid)}
@@ -608,8 +622,9 @@ export default function RentPaymentsPage() {
 
         <Link
           to="/staff/reports/payments"
-          className="mt-3 inline-flex min-h-11 items-center text-sm
-            font-semibold text-[#245747] underline underline-offset-4"
+          className="mt-2 inline-flex min-h-11 items-center
+            text-xs font-semibold text-[#245747]
+            underline underline-offset-4"
         >
           Open payment report
         </Link>
@@ -628,7 +643,7 @@ export default function RentPaymentsPage() {
         )}
 
         {hasBalance && !showPayment && (
-          <div className="mt-4">
+          <div className="mt-3">
             <button
               type="button"
               disabled={locked}
@@ -646,11 +661,11 @@ export default function RentPaymentsPage() {
             aria-busy={busy}
             className="mt-4 border-t border-[#245747]/15 pt-4"
           >
-            <h4 className="font-heading text-base font-semibold text-[#173F35]">
+            <h4 className="text-sm font-semibold text-[#173F35]">
               Record received payment
             </h4>
 
-            <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            <p className="mt-2 text-xs leading-6 text-[#57534E]">
               Record only confirmed cash or bank payments.
               {charge.is_initial_rent &&
                 " Initial rent requires full payment before the hold expires."}
@@ -658,7 +673,7 @@ export default function RentPaymentsPage() {
 
             <fieldset
               disabled={locked}
-              className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
             >
               <legend className="sr-only">Payment details</legend>
 
@@ -724,11 +739,10 @@ export default function RentPaymentsPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
+              <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-3">
                 <button type="submit" className={primaryButton}>
-                  {busy ? "Recording…" : "Save payment"}
+                  {busy ? "Saving…" : "Save payment"}
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setShowPayment(false)}
@@ -745,33 +759,21 @@ export default function RentPaymentsPage() {
   }
 
   return (
-    <section
-      aria-labelledby="rent-heading"
-      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
-    >
-      <header
-        className="flex flex-wrap items-center justify-between gap-4
-          rounded-2xl border border-[#245747]/10
-          bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD]
-          p-5 sm:p-6"
-      >
+    <section aria-labelledby="rent-heading" className="min-w-0 space-y-5">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#965038]">
-            Charges & records
-          </p>
           <h1
             id="rent-heading"
-            className="mt-2 font-heading text-2xl font-bold
-              tracking-tight text-[#173F35]"
+            className="font-heading text-2xl font-bold tracking-tight text-[#173F35]"
           >
             Rent & payments
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#57534E]">
-            Check balances, create monthly charges and record received payments.
+          <p className="mt-1 text-sm leading-6 text-[#57534E]">
+            Manage rent charges, balances and received payments.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
             disabled={busy || loading}
@@ -796,7 +798,7 @@ export default function RentPaymentsPage() {
         <p
           role="status"
           className="rounded-xl border border-emerald-100 bg-emerald-50
-            p-4 text-sm leading-6 text-emerald-800"
+            p-3 text-sm leading-6 text-emerald-800"
         >
           {message}
         </p>
@@ -806,7 +808,7 @@ export default function RentPaymentsPage() {
         <div
           role="alert"
           className="rounded-xl border border-amber-200 bg-amber-50
-            p-4 text-sm leading-6 text-amber-900"
+            p-3 text-sm leading-6 text-amber-900"
         >
           <p>{actionError}</p>
 
@@ -820,7 +822,7 @@ export default function RentPaymentsPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Link
                   to="/staff/reports/payments"
-                  className="inline-flex min-h-11 items-center rounded-lg
+                  className="inline-flex min-h-11 items-center
                     font-semibold underline underline-offset-4"
                 >
                   Open payment report
@@ -847,18 +849,13 @@ export default function RentPaymentsPage() {
           onKeyDown={handlePanelKeyDown}
           className={panelClass}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-[#965038]">
-                Monthly billing
-              </p>
-              <h2
-                id="create-charge-title"
-                className="mt-1 font-heading text-lg font-semibold text-[#173F35]"
-              >
-                Create a rent charge
-              </h2>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            <h2
+              id="create-charge-title"
+              className="text-base font-semibold text-[#173F35]"
+            >
+              Create a rent charge
+            </h2>
             <button
               type="button"
               disabled={busy}
@@ -877,7 +874,7 @@ export default function RentPaymentsPage() {
           <form onSubmit={handleCreate} aria-busy={busy}>
             <fieldset
               disabled={locked}
-              className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"
+              className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2"
             >
               <legend className="sr-only">New charge details</legend>
 
@@ -958,13 +955,14 @@ export default function RentPaymentsPage() {
         </section>
       )}
 
+      {/* Existing filters */}
       <form onSubmit={applyFilters} className={panelClass}>
         <fieldset disabled={busy || loading} className="min-w-0">
-          <legend className="font-heading text-base font-semibold text-[#173F35]">
+          <legend className="text-sm font-semibold text-[#173F35]">
             Find rent charges
           </legend>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
                 name: "search",
@@ -1027,7 +1025,7 @@ export default function RentPaymentsPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <button type="submit" className={primaryButton}>
               Apply filters
             </button>
@@ -1062,7 +1060,7 @@ export default function RentPaymentsPage() {
         </div>
       ) : charges.length === 0 ? (
         <div className={`${panelClass} py-9 text-center`}>
-          <h2 className="font-heading text-base font-semibold text-[#173F35]">
+          <h2 className="text-base font-semibold text-[#173F35]">
             No charges found
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#57534E]">
@@ -1070,97 +1068,137 @@ export default function RentPaymentsPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#245747]/15 bg-white">
-          {charges.map((charge) => {
-            const selected = selectedCharge?.id === charge.id;
-            const balance = toCents(charge.payment_summary?.balance);
-            const canPay = balance !== null && balance > 0;
+        <div className="overflow-hidden rounded-xl border border-[#245747]/15 bg-white">
+          {/* Desktop column headings */}
+          <div
+            aria-hidden="true"
+            className={`${rowGrid} hidden border-b border-[#245747]/10
+              bg-[#F3F5F0] px-4 py-3 text-xs font-semibold
+              text-[#57534E] lg:grid`}
+          >
+            <span>Resident / room</span>
+            <span>Billing month</span>
+            <span>Balance</span>
+            <span>Status</span>
+            <span className="text-right">Details</span>
+          </div>
 
-            return (
-              <article
-                key={charge.id}
-                className="min-w-0 border-b border-[#245747]/10 last:border-b-0"
-              >
-                <div
-                  className={`grid min-w-0 gap-4 p-4 sm:p-5
-                    xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]
-                    ${selected ? "bg-[#EDF3E8]/70" : ""}`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="break-words font-heading text-base font-semibold text-[#173F35]">
-                        {residentLabel(charge)}
-                      </h2>
-                      <span className="rounded-md bg-[#E8EDE4] px-2 py-1 text-xs font-medium text-[#245747]">
-                        Room {charge.room_number || "unavailable"}
-                      </span>
-                      <PaymentBadge status={charge.payment_summary?.status} />
-                    </div>
+          <ul
+            aria-label="Rent charges"
+            className="divide-y divide-[#245747]/10"
+          >
+            {charges.map((charge) => {
+              const selected = selectedCharge?.id === charge.id;
+              const name = residentLabel(charge);
 
-                    <p className="mt-2 text-sm font-medium text-[#57534E]">
-                      {formatDate(charge.billing_month, true)} rent
-                      {charge.is_initial_rent && (
-                        <span className="ml-2 text-xs text-[#965038]">
-                          Initial rent
+              return (
+                <li key={charge.id} className="min-w-0">
+                  <article aria-labelledby={`charge-row-${charge.id}`}>
+                    <div
+                      className={`${rowGrid} px-4 py-3 transition-colors ${
+                        selected
+                          ? "bg-[#EDF3E8]"
+                          : "hover:bg-[#FAFBF8]"
+                      }`}
+                    >
+                      {/* Resident and room */}
+                      <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
+                        <span
+                          aria-hidden="true"
+                          className="flex size-9 shrink-0 items-center
+                            justify-center rounded-full bg-[#E8EDE4]
+                            text-xs font-semibold text-[#245747]"
+                        >
+                          {name.trim().charAt(0).toUpperCase() || "R"}
                         </span>
-                      )}
-                    </p>
 
-                    <p className="mt-1 text-xs text-[#78716C]">
-                      Due {formatDate(charge.due_date)}
-                    </p>
-                  </div>
-
-                  <div className="min-w-0">
-                    <dl className="grid grid-cols-2 gap-4">
-                      <DetailItem label="Amount" value={money(charge.amount)} />
-                      <div className="min-w-0">
-                        <dt className="text-xs text-[#78716C]">Balance</dt>
-                        <dd className="mt-1 break-words text-sm font-bold tabular-nums text-[#245747]">
-                          {money(charge.payment_summary?.balance)}
-                        </dd>
+                        <div className="min-w-0">
+                          <h2
+                            id={`charge-row-${charge.id}`}
+                            title={name}
+                            className="truncate text-sm font-semibold text-[#173F35]"
+                          >
+                            {name}
+                          </h2>
+                          <p className="mt-0.5 text-xs text-[#78716C]">
+                            Room {charge.room_number || "unavailable"}
+                          </p>
+                        </div>
                       </div>
-                    </dl>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={(event) =>
-                          selected
-                            ? closePanel()
-                            : openCharge(charge, event.currentTarget)
-                        }
-                        aria-label={`${selected ? "Hide" : "View"} details for ${residentLabel(charge)}, room ${charge.room_number}, ${formatDate(charge.billing_month, true)}`}
-                        aria-expanded={selected}
-                        aria-controls={
-                          selected ? `charge-details-${charge.id}` : undefined
-                        }
-                        className={secondaryButton}
-                      >
-                        {selected ? "Hide details" : "View details"}
-                      </button>
+                      {/* Billing month */}
+                      <div className="min-w-0">
+                        <p className="mb-1 text-xs text-[#78716C] lg:hidden">
+                          Billing month
+                        </p>
+                        <p className="text-sm text-[#173F35]">
+                          {formatDate(charge.billing_month, true)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[#78716C]">
+                          {charge.is_initial_rent
+                            ? "Initial rent"
+                            : "Monthly rent"}
+                        </p>
+                      </div>
 
-                      {canPay && (
+                      {/* Outstanding balance */}
+                      <div className="min-w-0">
+                        <p className="mb-1 text-xs text-[#78716C] lg:hidden">
+                          Balance
+                        </p>
+                        <p className="break-words text-sm font-semibold tabular-nums text-[#245747]">
+                          {money(charge.payment_summary?.balance)}
+                        </p>
+                        <p className="mt-0.5 break-words text-xs tabular-nums text-[#78716C]">
+                          Of {money(charge.amount)}
+                        </p>
+                      </div>
+
+                      {/* Payment status */}
+                      <div className="min-w-0">
+                        <span className="sr-only">Payment status: </span>
+                        <PaymentBadge
+                          status={charge.payment_summary?.status}
+                        />
+                      </div>
+
+                      {/* Expandable details */}
+                      <div className="flex justify-end">
                         <button
                           type="button"
-                          disabled={locked}
+                          disabled={busy}
                           onClick={(event) =>
-                            openCharge(charge, event.currentTarget, true)
+                            selected
+                              ? closePanel()
+                              : openCharge(charge, event.currentTarget)
                           }
-                          className={primaryButton}
+                          aria-label={`${
+                            selected ? "Hide" : "View"
+                          } details for ${name}, room ${
+                            charge.room_number
+                          }, ${formatDate(charge.billing_month, true)}`}
+                          aria-expanded={selected}
+                          aria-controls={
+                            selected
+                              ? `charge-details-${charge.id}`
+                              : undefined
+                          }
+                          className={secondaryButton}
                         >
-                          Record payment
+                          {selected ? "Hide details" : "View details"}
+                          <span aria-hidden="true">
+                            {selected ? "−" : "+"}
+                          </span>
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {selected && renderChargeDetails(charge)}
-              </article>
-            );
-          })}
+                    {selected && renderChargeDetails(charge)}
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -1176,7 +1214,11 @@ export default function RentPaymentsPage() {
         >
           Previous
         </button>
-        <span className="text-sm text-[#57534E]">Page {page}</span>
+
+        <span className="text-xs text-[#57534E]">
+          Page {page}
+        </span>
+
         <button
           type="button"
           disabled={loading || busy || Boolean(error) || !hasNext}
