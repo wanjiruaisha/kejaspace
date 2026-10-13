@@ -22,8 +22,8 @@ const methodStyles = {
 };
 
 const buttonBase =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl " +
-  "px-4 py-2 text-sm font-semibold transition-colors " +
+  "inline-flex min-h-11 items-center justify-center gap-2 " +
+  "rounded-lg px-3 py-2 text-xs font-semibold transition-colors " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-50";
@@ -36,14 +36,18 @@ const secondaryButton =
   "text-[#245747] hover:bg-[#EDF3E8]";
 
 const inputStyle =
-  "mt-2 min-h-11 w-full min-w-0 rounded-xl border border-[#245747]/20 " +
-  "bg-white px-3.5 py-2.5 text-sm text-[#173F35] " +
+  "mt-2 min-h-11 w-full min-w-0 rounded-lg border border-[#245747]/20 " +
+  "bg-white px-3 py-2 text-sm text-[#173F35] " +
   "placeholder:text-[#78716C] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-[#245747] " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
-const labelStyle = "block text-sm font-semibold text-[#173F35]";
+const labelStyle = "block text-xs font-semibold text-[#173F35]";
+
+const rowGrid =
+  "grid min-w-0 grid-cols-2 items-center gap-x-4 gap-y-3 " +
+  "xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_minmax(0,1fr)_120px]";
 
 const moneyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",
@@ -56,6 +60,17 @@ const dateFormatter = new Intl.DateTimeFormat("en-KE", {
   dateStyle: "medium",
   timeStyle: "short",
   timeZone: "Africa/Nairobi",
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-KE", {
+  dateStyle: "medium",
+  timeZone: "Africa/Nairobi",
+});
+
+const monthFormatter = new Intl.DateTimeFormat("en-KE", {
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
 });
 
 function formatMoney(value) {
@@ -72,20 +87,40 @@ function formatMoney(value) {
   return moneyFormatter.format(amount);
 }
 
-function formatDate(value) {
+function formatDate(value, includeTime = true) {
   if (!value) return "Unavailable";
 
   const date = new Date(value);
 
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  return includeTime
+    ? dateFormatter.format(date)
+    : shortDateFormatter.format(date);
+}
+
+function formatBillingMonth(value) {
+  if (typeof value !== "string") return "Unavailable";
+
+  const match = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(value);
+
+  if (!match) return "Unavailable";
+
+  const month = Number(match[2]);
+
+  if (month < 1 || month > 12) return "Unavailable";
+
+  const date = new Date(`${match[1]}-${match[2]}-01T00:00:00Z`);
+
   return Number.isNaN(date.getTime())
     ? "Unavailable"
-    : dateFormatter.format(date);
+    : monthFormatter.format(date);
 }
 
 function MethodBadge({ method }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
         methodStyles[method] || "bg-stone-100 text-stone-600"
       }`}
     >
@@ -242,41 +277,44 @@ export default function PaymentReportPage() {
   });
 
   return (
-    <section className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
-      {/* Page header */}
-      <header className="rounded-2xl border border-[#245747]/10 bg-gradient-to-br from-[#FAF7F2] via-[#EDF3E8] to-[#DCE9DD] p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
-              Reports
-            </p>
+    <section
+      aria-labelledby="payment-report-heading"
+      className="mx-auto w-full min-w-0 max-w-6xl space-y-5"
+    >
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#965038]">
+            Reports
+          </p>
 
-            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]">
-              Payment report
-            </h1>
-
-            <p className="mt-2 text-sm leading-6 text-[#57534E]">
-              Find recorded payments by resident, room, reference,
-              payment method or date.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={refreshReport}
-            disabled={loading}
-            className={secondaryButton}
+          <h1
+            id="payment-report-heading"
+            className="mt-2 font-heading text-2xl font-bold tracking-tight text-[#173F35]"
           >
-            {loading ? "Loading…" : "Refresh report"}
-          </button>
+            Payment report
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-[#57534E]">
+            Review recorded payments, billing months and payment references.
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={refreshReport}
+          disabled={loading}
+          className={secondaryButton}
+        >
+          <span aria-hidden="true">↻</span>
+          {loading ? "Loading…" : "Refresh report"}
+        </button>
       </header>
 
-      {/* Search and filters */}
+      {/* Existing search and filters */}
       <form
         onSubmit={applyFilters}
         aria-describedby={filterError ? "payment-filter-error" : undefined}
-        className="rounded-2xl border border-[#245747]/15 bg-white p-4 sm:p-5"
+        className="rounded-xl border border-[#245747]/15 bg-white p-4"
       >
         <fieldset disabled={loading} className="min-w-0">
           <legend className="sr-only">Filter recorded payments</legend>
@@ -389,7 +427,6 @@ export default function PaymentReportPage() {
         </fieldset>
       </form>
 
-      {/* Applied filters describe the results currently being displayed. */}
       {hasAppliedFilters && (
         <div
           aria-label="Applied payment filters"
@@ -437,11 +474,10 @@ export default function PaymentReportPage() {
         )}
       </div>
 
-      {/* Payment list */}
       {loading ? (
         <p
           role="status"
-          className="rounded-2xl border border-[#245747]/15 bg-white p-6 text-sm text-[#57534E]"
+          className="rounded-xl border border-[#245747]/15 bg-white p-5 text-sm text-[#57534E]"
         >
           Loading the payment report…
         </p>
@@ -456,7 +492,7 @@ export default function PaymentReportPage() {
             <button
               type="button"
               onClick={refreshReport}
-              className="min-h-11 font-semibold underline"
+              className="min-h-11 rounded-lg font-semibold underline"
             >
               Try again
             </button>
@@ -465,7 +501,7 @@ export default function PaymentReportPage() {
               <button
                 type="button"
                 onClick={() => changePage(1)}
-                className="min-h-11 font-semibold underline"
+                className="min-h-11 rounded-lg font-semibold underline"
               >
                 Return to page 1
               </button>
@@ -473,7 +509,7 @@ export default function PaymentReportPage() {
           </div>
         </div>
       ) : payments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#245747]/25 bg-white p-6 text-center">
+        <div className="rounded-xl border border-dashed border-[#245747]/25 bg-white px-5 py-8 text-center">
           <h3 className="font-heading text-base font-semibold text-[#173F35]">
             No recorded payments found
           </h3>
@@ -484,162 +520,222 @@ export default function PaymentReportPage() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {payments.map((payment) => {
-            const expanded = expandedId === payment.id;
-            const detailsId = `payment-details-${payment.id}`;
+        <div className="overflow-hidden rounded-xl border border-[#245747]/15 bg-white">
+          {/* Column headings on wide screens */}
+          <div
+            aria-hidden="true"
+            className={`${rowGrid} hidden border-b border-[#245747]/10 bg-[#F5F7F3] px-4 py-3 text-xs font-semibold text-[#57534E] xl:grid`}
+          >
+            <span>Resident / room</span>
+            <span>Billing month</span>
+            <span>Amount</span>
+            <span>Method</span>
+            <span>Recorded on</span>
+            <span className="text-right">Details</span>
+          </div>
 
-            return (
-              <li
-                key={payment.id}
-                className={`overflow-hidden rounded-2xl border bg-white ${
-                  expanded
-                    ? "border-[#245747]/40"
-                    : "border-[#245747]/15"
-                }`}
-              >
-                <article aria-labelledby={`payment-heading-${payment.id}`}>
-                  <div className="grid items-center gap-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-                    <div className="min-w-0">
-                      <p className="text-xs text-[#78716C]">
-                        Payment #{payment.id} · Room{" "}
-                        {payment.room_number || "unavailable"}
-                      </p>
+          <ul className="divide-y divide-[#245747]/10">
+            {payments.map((payment) => {
+              const expanded = expandedId === payment.id;
+              const detailsId = `payment-details-${payment.id}`;
+              const toggleId = `payment-toggle-${payment.id}`;
+              const residentName =
+                payment.resident_name || "Name unavailable";
 
-                      <h3
-                        id={`payment-heading-${payment.id}`}
-                        title={payment.resident_name || ""}
-                        className="mt-1 truncate font-heading text-base font-semibold text-[#173F35]"
-                      >
-                        {payment.resident_name || "Name unavailable"}
-                      </h3>
-
-                      <p className="mt-2 text-xs leading-5 text-[#78716C]">
-                        Recorded: {formatDate(payment.created_at)} · Nairobi
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 md:flex-col md:items-end md:gap-2">
-                      <p className="text-base font-semibold tabular-nums text-[#173F35]">
-                        {formatMoney(payment.amount)}
-                      </p>
-
-                      <MethodBadge method={payment.method} />
-                    </div>
-
-                    <button
-                      type="button"
-                      aria-expanded={expanded}
-                      aria-controls={detailsId}
-                      aria-label={`${
-                        expanded ? "Hide" : "View"
-                      } details for payment ${payment.id}`}
-                      onClick={() =>
-                        setExpandedId((current) =>
-                          current === payment.id ? null : payment.id,
-                        )
-                      }
-                      className={`${secondaryButton} w-full md:w-auto`}
-                    >
-                      {expanded ? "Hide details" : "View details"}
-                      <span aria-hidden="true">
-                        {expanded ? "−" : "+"}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Full payment details */}
-                  <div
-                    id={detailsId}
-                    hidden={!expanded}
-                    className="border-t border-[#245747]/10 bg-[#FAF7F2] p-4 sm:p-5"
+              return (
+                <li key={payment.id} className="min-w-0">
+                  <article
+                    aria-labelledby={`payment-heading-${payment.id}`}
+                    className="min-w-0"
                   >
-                    <h4 className="text-sm font-semibold text-[#173F35]">
-                      Payment details
-                    </h4>
+                    <div
+                      className={`${rowGrid} px-4 py-3 transition-colors ${
+                        expanded
+                          ? "bg-[#EDF3E8]"
+                          : "hover:bg-[#FAFBF8]"
+                      }`}
+                    >
+                      <div className="col-span-2 min-w-0 xl:col-span-1">
+                        <h3
+                          id={`payment-heading-${payment.id}`}
+                          title={residentName}
+                          className="truncate text-sm font-semibold text-[#173F35]"
+                        >
+                          {residentName}
+                        </h3>
 
-                    <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                      <div className="min-w-0">
-                        <dt className="text-xs text-[#78716C]">Resident</dt>
-                        <dd className="mt-1 break-words font-medium text-[#173F35]">
-                          {payment.resident_name || "Name unavailable"}
-                        </dd>
+                        <p className="mt-1 truncate text-xs text-[#78716C]">
+                          {payment.room_number
+                            ? `Room ${payment.room_number}`
+                            : "Room unavailable"}
+                        </p>
                       </div>
 
                       <div className="min-w-0">
-                        <dt className="text-xs text-[#78716C]">Room</dt>
-                        <dd className="mt-1 break-words font-medium text-[#173F35]">
-                          {payment.room_number || "Unavailable"}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="text-xs text-[#78716C]">
-                          Charge number
-                        </dt>
-                        <dd className="mt-1 font-medium text-[#173F35]">
-                          {payment.charge != null
-                            ? `#${payment.charge}`
-                            : "Unavailable"}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="text-xs text-[#78716C]">
+                        <p className="mb-1 text-xs text-[#78716C] xl:hidden">
                           Billing month
-                        </dt>
-                        <dd className="mt-1 font-medium text-[#173F35]">
-                          {typeof payment.billing_month === "string"
-                            ? payment.billing_month.slice(0, 7)
-                            : "Unavailable"}
-                        </dd>
+                        </p>
+
+                        <p className="text-sm text-[#57534E]">
+                          {formatBillingMonth(payment.billing_month)}
+                        </p>
                       </div>
 
-                      <div>
-                        <dt className="text-xs text-[#78716C]">Amount</dt>
-                        <dd className="mt-1 font-semibold tabular-nums text-[#173F35]">
+                      <div className="min-w-0">
+                        <p className="mb-1 text-xs text-[#78716C] xl:hidden">
+                          Amount
+                        </p>
+
+                        <p className="text-sm font-semibold tabular-nums text-[#173F35]">
                           {formatMoney(payment.amount)}
-                        </dd>
+                        </p>
                       </div>
 
                       <div>
-                        <dt className="text-xs text-[#78716C]">
-                          Payment method
-                        </dt>
-                        <dd className="mt-1 font-medium text-[#173F35]">
-                          {methodLabels[payment.method] ||
-                            payment.method ||
-                            "Unavailable"}
-                        </dd>
+                        <p className="mb-1 text-xs text-[#78716C] xl:hidden">
+                          Method
+                        </p>
+
+                        <MethodBadge method={payment.method} />
                       </div>
 
-                      <div className="sm:col-span-2 lg:col-span-3">
-                        <dt className="text-xs text-[#78716C]">
-                          Recorded at · Nairobi time
-                        </dt>
-                        <dd className="mt-1 font-medium text-[#173F35]">
-                          {formatDate(payment.created_at)}
-                        </dd>
+                      <div className="min-w-0">
+                        <p className="mb-1 text-xs text-[#78716C] xl:hidden">
+                          Recorded on
+                        </p>
+
+                        <p className="text-sm text-[#57534E]">
+                          {formatDate(payment.created_at, false)}
+                        </p>
                       </div>
 
-                      <div className="min-w-0 border-t border-[#245747]/10 pt-4 sm:col-span-2 lg:col-span-3">
-                        <dt className="text-xs text-[#78716C]">
-                          Payment reference
-                        </dt>
-                        <dd className="mt-2 break-all rounded-lg border border-[#245747]/10 bg-white px-3 py-2 font-mono text-xs leading-6 text-[#173F35]">
-                          {payment.reference || "Unavailable"}
-                        </dd>
+                      <div className="col-span-2 justify-self-end xl:col-span-1">
+                        <button
+                          id={toggleId}
+                          type="button"
+                          aria-expanded={expanded}
+                          aria-controls={detailsId}
+                          aria-label={`${
+                            expanded ? "Hide" : "View"
+                          } payment details for ${residentName}, ${formatMoney(
+                            payment.amount,
+                          )}`}
+                          onClick={() =>
+                            setExpandedId((current) =>
+                              current === payment.id ? null : payment.id,
+                            )
+                          }
+                          className={secondaryButton}
+                        >
+                          {expanded ? "Hide details" : "View details"}
+                          <span aria-hidden="true">
+                            {expanded ? "−" : "+"}
+                          </span>
+                        </button>
                       </div>
-                    </dl>
-                  </div>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+                    </div>
+
+                    <section
+                      id={detailsId}
+                      hidden={!expanded}
+                      aria-labelledby={`payment-details-heading-${payment.id}`}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          setExpandedId(null);
+                          document.getElementById(toggleId)?.focus();
+                        }
+                      }}
+                      className="border-t border-[#245747]/10 bg-[#FAF7F2] p-4 sm:p-5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4
+                          id={`payment-details-heading-${payment.id}`}
+                          className="font-heading text-base font-semibold text-[#173F35]"
+                        >
+                          Payment details
+                        </h4>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedId(null);
+                            document.getElementById(toggleId)?.focus();
+                          }}
+                          className={`${secondaryButton} shrink-0`}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {[
+                          ["Resident", residentName],
+                          ["Room", payment.room_number || "Unavailable"],
+                          [
+                            "Billing month",
+                            formatBillingMonth(payment.billing_month),
+                          ],
+                          ["Amount", formatMoney(payment.amount)],
+                          [
+                            "Payment method",
+                            methodLabels[payment.method] ||
+                              payment.method ||
+                              "Unavailable",
+                          ],
+                          [
+                            "Recorded at · Nairobi time",
+                            formatDate(payment.created_at),
+                          ],
+                        ].map(([label, value]) => (
+                          <div key={label} className="min-w-0">
+                            <dt className="text-xs text-[#78716C]">
+                              {label}
+                            </dt>
+
+                            <dd className="mt-1 break-words text-sm font-medium text-[#173F35]">
+                              {value}
+                            </dd>
+                          </div>
+                        ))}
+
+                        <div className="min-w-0 border-t border-[#245747]/10 pt-4 sm:col-span-2 lg:col-span-3">
+                          <dt className="text-xs text-[#78716C]">
+                            Payment reference
+                          </dt>
+
+                          <dd className="mt-2 break-all rounded-lg border border-[#245747]/10 bg-white px-3 py-2 font-mono text-xs leading-6 text-[#173F35]">
+                            {payment.reference || "Unavailable"}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="text-xs text-[#78716C]">
+                            Internal payment reference
+                          </dt>
+                          <dd className="mt-1 text-xs text-[#57534E]">
+                            {payment.id}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="text-xs text-[#78716C]">
+                            Internal charge reference
+                          </dt>
+                          <dd className="mt-1 text-xs text-[#57534E]">
+                            {payment.charge ?? "Unavailable"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
-      {/* Pagination */}
       {!error && (
         <nav
           aria-label="Payment report pages"
@@ -654,7 +750,7 @@ export default function PaymentReportPage() {
             Previous
           </button>
 
-          <span className="text-sm text-[#78716C]">Page {page}</span>
+          <span className="text-xs text-[#78716C]">Page {page}</span>
 
           <button
             type="button"
@@ -667,7 +763,7 @@ export default function PaymentReportPage() {
         </nav>
       )}
 
-      <p className="rounded-xl bg-[#E8EDE4]/60 px-4 py-3 text-xs leading-6 text-[#57534E]">
+      <p className="text-xs leading-6 text-[#78716C]">
         Dates shown use Nairobi time. Date filters use the backend’s
         configured timezone. This report lists recorded payments, not
         outstanding balances or unresolved payment attempts.
