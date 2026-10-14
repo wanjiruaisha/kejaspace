@@ -308,7 +308,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
               id={`mpesa-phone-${chargeId}`}
               type="tel"
               autoComplete="tel"
-              placeholder="2547XXXXXXXX"
+              placeholder="0712345678"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               disabled={Boolean(busy)}
