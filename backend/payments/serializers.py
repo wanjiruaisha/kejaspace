@@ -107,13 +107,27 @@ class ManualPaymentSerializer(PaymentSerializer):
         ]    
 
 
+import re
+
 class MpesaInitiateSerializer(serializers.Serializer):
     charge = serializers.PrimaryKeyRelatedField(
         queryset=Charge.objects.none()
     )
-
     phone_number = serializers.CharField(max_length=20)
 
+    def validate_phone_number(self, value):
+        digits = re.sub(r"\D", "", value)
+
+        if re.fullmatch(r"0[17]\d{8}", digits):
+            # Example: 0712345678 → 254712345678
+            digits = "254" + digits[1:]
+        elif not re.fullmatch(r"254[17]\d{8}", digits):
+            raise serializers.ValidationError(
+                "Enter a valid Kenyan number, such as 0712345678."
+            )
+
+        return digits
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
