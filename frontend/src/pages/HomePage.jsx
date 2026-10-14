@@ -170,7 +170,6 @@ export default function HomePage() {
         </div>
 
         <p className="absolute bottom-3 right-4 rounded bg-black/60 px-2 py-1 text-[10px] text-white sm:right-8">
-          Illustrative shared lounge
         </p>
       </section>
 
