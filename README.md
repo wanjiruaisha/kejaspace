@@ -169,25 +169,6 @@ python -m pip install -r requirements.txt
 
 Configure the environment values consumed by `backend/keja_project/settings.py`. Use the repository's environment example if one is available. The table below describes the required configuration; **the Django and database variable names must match the names actually read by your settings file**.
 
-| Configuration | Local value or purpose |
-| --- | --- |
-| Django secret key | A private, generated development secret. |
-| Debug mode | Enabled locally; disabled in production. |
-| Allowed hosts | Include `localhost` and `127.0.0.1` locally. |
-| Database connection | Your local or Neon PostgreSQL connection; use the database URL or individual fields expected by settings. |
-| `CORS_ALLOWED_ORIGINS` | Include `http://localhost:5173`; use the parsing format expected by settings. |
-| `MPESA_ENVIRONMENT` | `sandbox` for the currently configured integration. |
-| `MPESA_CONSUMER_KEY` | Daraja application consumer key. |
-| `MPESA_CONSUMER_SECRET` | Daraja application consumer secret. |
-| `MPESA_SHORTCODE` | Shortcode associated with the configured test credentials. |
-| `MPESA_PASSKEY` | Passkey associated with that shortcode. |
-| `MPESA_CALLBACK_URL` | Public HTTPS URL ending in `/api/payments/mpesa/callback/`. |
-
-If your settings use `os.getenv()`, environment variables must be supplied to the process. `os.getenv()` does not load a `.env` file by itself: use the project's dotenv loader, export the variables in your terminal, or configure them on the hosting service.
-
-Never commit secrets, database credentials, JWTs or M-Pesa credentials. Keep environment files excluded from Git.
-
-With the configured environment loaded, run:
 
 ```bash
 python manage.py migrate
