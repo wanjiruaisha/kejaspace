@@ -112,6 +112,8 @@ kejaspace/
         └── utils/
 ```
 
+
+
 ## Local setup
 
 ### Prerequisites
@@ -123,6 +125,17 @@ kejaspace/
 - Daraja credentials only if testing the M-Pesa integration.
 
 Clone this repository using its GitHub URL, then open the `kejaspace` directory.
+
+## Clone the repository
+Install Git, then open a terminal and run:
+
+```bash
+git clone https://github.com/wanjiruaisha/kejaspace.git
+```
+
+```bash
+cd kejaspace.git
+```
 
 ### 1. Set up the backend
 
