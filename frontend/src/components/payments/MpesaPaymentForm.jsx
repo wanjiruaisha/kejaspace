@@ -28,6 +28,20 @@ function readSavedAttempt(storageKey) {
   }
 }
 
+function toMpesaFormat(value) {
+  const digits = value.replace(/\D/g, "");
+
+  if (/^0[17]\d{8}$/.test(digits)) {
+    return `254${digits.slice(1)}`;
+  }
+
+  if (/^254[17]\d{8}$/.test(digits)) {
+    return digits;
+  }
+
+  return null;
+}
+
 function getErrorMessage(error) {
   if (typeof error.data?.detail === "string") {
     return error.data.detail;
@@ -37,9 +51,7 @@ function getErrorMessage(error) {
     const messages = Object.entries(error.data)
       .filter(([key]) => key !== "attempt_id")
       .map(([key, value]) => {
-        const text = Array.isArray(value)
-          ? value.join(" ")
-          : String(value);
+        const text = Array.isArray(value) ? value.join(" ") : String(value);
 
         return `${key}: ${text}`;
       });
@@ -53,18 +65,14 @@ function getErrorMessage(error) {
 export default function MpesaPaymentForm({ chargeId, userId }) {
   const storageKey = `kejaspace:mpesa:${userId}:${chargeId}`;
 
-  const [attempt, setAttempt] = useState(() =>
-    readSavedAttempt(storageKey),
-  );
+  const [attempt, setAttempt] = useState(() => readSavedAttempt(storageKey));
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
   const requestInProgress = useRef(false);
 
-  const canStart =
-    !attempt ||
-    attempt.phase === "failed";
+  const canStart = !attempt || attempt.phase === "failed";
 
   const canVerify =
     attempt?.attemptId &&
@@ -87,10 +95,10 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
 
     if (requestInProgress.current || !canStart) return;
 
-    const phoneNumber = phone.trim();
+    const phoneNumber = toMpesaFormat(phone);
 
-    if (!/^254[17]\d{8}$/.test(phoneNumber)) {
-      setError("Enter your number in the format 2547XXXXXXXX or 2541XXXXXXXX.");
+    if (!phoneNumber) {
+      setError("Enter a valid Kenyan number, such as 0712345678.");
       return;
     }
 
@@ -103,10 +111,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
 
     // Save a marker BEFORE sending, in case the page is refreshed.
     try {
-      sessionStorage.setItem(
-        storageKey,
-        JSON.stringify(startingAttempt),
-      );
+      sessionStorage.setItem(storageKey, JSON.stringify(startingAttempt));
     } catch {
       setError(
         "Your browser could not save the payment request. Enable site storage before continuing.",
@@ -120,10 +125,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
     setAttempt(startingAttempt);
 
     try {
-      const data = await initiateMpesaPayment(
-        chargeId,
-        phoneNumber,
-      );
+      const data = await initiateMpesaPayment(chargeId, phoneNumber);
 
       if (!data?.attempt_id || data.status !== "pending") {
         rememberAttempt({
@@ -205,18 +207,13 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
         rememberAttempt({
           phase: "review",
           attemptId: attempt.attemptId,
-          message:
-            data.detail || "This payment requires staff review.",
+          message: data.detail || "This payment requires staff review.",
         });
-      } else if (
-        data?.status === "failed" &&
-        data.payment_recorded === false
-      ) {
+      } else if (data?.status === "failed" && data.payment_recorded === false) {
         rememberAttempt({
           phase: "failed",
           attemptId: attempt.attemptId,
-          message:
-            data.detail || "The payment was unsuccessful.",
+          message: data.detail || "The payment was unsuccessful.",
         });
       } else {
         rememberAttempt({
@@ -239,7 +236,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
       } else {
         setError(
           `${message} This does not confirm that the payment failed. ` +
-          "Check this same attempt again later.",
+            "Check this same attempt again later.",
         );
       }
     } finally {
@@ -250,13 +247,11 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
 
   return (
     <div className="mt-6 border-t border-slate-200 pt-6">
-      <h3 className="font-semibold text-slate-900">
-        Pay with M-Pesa
-      </h3>
+      <h3 className="font-semibold text-slate-900">Pay with M-Pesa</h3>
 
       <p className="mt-2 text-xs leading-6 text-slate-500">
-        Sandbox testing only. This integration is not configured
-        for live payments.
+        Sandbox testing only. This integration is not configured for live
+        payments.
       </p>
 
       {attempt && (
@@ -278,8 +273,8 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
 
           {attempt.phase === "review" && (
             <p className="mt-2 font-medium">
-              Contact hostel staff with this attempt number.
-              Do not start another payment yet.
+              Contact hostel staff with this attempt number. Do not start
+              another payment yet.
             </p>
           )}
         </div>
@@ -308,7 +303,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
               id={`mpesa-phone-${chargeId}`}
               type="tel"
               autoComplete="tel"
-              placeholder="0712345678"
+              placeholder="2547XXXXXXXXor 0712345678"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               disabled={Boolean(busy)}
@@ -344,9 +339,7 @@ export default function MpesaPaymentForm({ chargeId, userId }) {
           disabled={Boolean(busy)}
           className="mt-4 w-full rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
         >
-          {busy === "verify"
-            ? "Checking payment…"
-            : "Check payment status"}
+          {busy === "verify" ? "Checking payment…" : "Check payment status"}
         </button>
       )}
     </div>
