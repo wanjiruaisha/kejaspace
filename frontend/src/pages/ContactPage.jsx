@@ -115,11 +115,7 @@ export default function ContactPage() {
           md:grid-cols-[1.1fr_0.9fr]"
       >
         <div className="relative px-5 py-8 sm:px-8 sm:py-10">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-5 top-6
-              size-20 rounded-full border-[14px] border-[#E9BC9F]/25"
-          />
+         
 
           <div className="relative">
             <p
